@@ -1,0 +1,15 @@
+# IDE 缓存
+.vs/
+*.user
+*.suo
+
+# 编译输出
+bin/
+obj/
+
+# 发布目录
+publish/
+
+# 运行时生成的文件
+config.json
+logs/

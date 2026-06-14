@@ -1,0 +1,204 @@
+{
+  "version": 4,
+  "targets": {
+    "net8.0-windows": {
+      "Newtonsoft.Json/13.0.3": {
+        "type": "package",
+        "compile": {
+          "lib/net6.0/Newtonsoft.Json.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "lib/net6.0/Newtonsoft.Json.dll": {
+            "related": ".xml"
+          }
+        }
+      },
+      "SunnyUI/3.9.7": {
+        "type": "package",
+        "dependencies": {
+          "SunnyUI.Common": "3.9.7"
+        },
+        "compile": {
+          "lib/net8.0-windows7.0/SunnyUI.dll": {}
+        },
+        "runtime": {
+          "lib/net8.0-windows7.0/SunnyUI.dll": {}
+        },
+        "frameworkReferences": [
+          "Microsoft.WindowsDesktop.App.WindowsForms"
+        ]
+      },
+      "SunnyUI.Common/3.9.7": {
+        "type": "package",
+        "compile": {
+          "lib/net8.0/SunnyUI.Common.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "lib/net8.0/SunnyUI.Common.dll": {
+            "related": ".xml"
+          }
+        }
+      }
+    }
+  },
+  "libraries": {
+    "Newtonsoft.Json/13.0.3": {
+      "sha512": "HrC5BXdl00IP9zeV+0Z848QWPAoCr9P3bDEZguI+gkLcBKAOxix/tLEAAHC+UvDNPv4a2d18lOReHMOagPa+zQ==",
+      "type": "package",
+      "path": "newtonsoft.json/13.0.3",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "LICENSE.md",
+        "README.md",
+        "lib/net20/Newtonsoft.Json.dll",
+        "lib/net20/Newtonsoft.Json.xml",
+        "lib/net35/Newtonsoft.Json.dll",
+        "lib/net35/Newtonsoft.Json.xml",
+        "lib/net40/Newtonsoft.Json.dll",
+        "lib/net40/Newtonsoft.Json.xml",
+        "lib/net45/Newtonsoft.Json.dll",
+        "lib/net45/Newtonsoft.Json.xml",
+        "lib/net6.0/Newtonsoft.Json.dll",
+        "lib/net6.0/Newtonsoft.Json.xml",
+        "lib/netstandard1.0/Newtonsoft.Json.dll",
+        "lib/netstandard1.0/Newtonsoft.Json.xml",
+        "lib/netstandard1.3/Newtonsoft.Json.dll",
+        "lib/netstandard1.3/Newtonsoft.Json.xml",
+        "lib/netstandard2.0/Newtonsoft.Json.dll",
+        "lib/netstandard2.0/Newtonsoft.Json.xml",
+        "newtonsoft.json.13.0.3.nupkg.sha512",
+        "newtonsoft.json.nuspec",
+        "packageIcon.png"
+      ]
+    },
+    "SunnyUI/3.9.7": {
+      "sha512": "/TJ3o4ufoPvizw/jRvMd1uQizaLPVx3VY41zPHFOgic9Ii5RmwsNL9WNnP8QPtSR/8tnQKCfzaOBFc3YQD+erg==",
+      "type": "package",
+      "path": "sunnyui/3.9.7",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "LICENSE",
+        "README.md",
+        "SunnyUI.png",
+        "lib/net10.0-windows7.0/SunnyUI.dll",
+        "lib/net40/SunnyUI.dll",
+        "lib/net472/SunnyUI.dll",
+        "lib/net8.0-windows7.0/SunnyUI.dll",
+        "sunnyui.3.9.7.nupkg.sha512",
+        "sunnyui.nuspec"
+      ]
+    },
+    "SunnyUI.Common/3.9.7": {
+      "sha512": "V4bgJQUbPbrNaLZhiaX2SitsLGII7CLGB07FI2bBvv/LlhwKK1qmB9tSuKNRk/wlQblfBSqyI/pwrQIcKu0QVw==",
+      "type": "package",
+      "path": "sunnyui.common/3.9.7",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "README.md",
+        "SunnyUI.png",
+        "lib/net10.0/SunnyUI.Common.dll",
+        "lib/net10.0/SunnyUI.Common.xml",
+        "lib/net40/SunnyUI.Common.dll",
+        "lib/net40/SunnyUI.Common.xml",
+        "lib/net472/SunnyUI.Common.dll",
+        "lib/net472/SunnyUI.Common.xml",
+        "lib/net8.0/SunnyUI.Common.dll",
+        "lib/net8.0/SunnyUI.Common.xml",
+        "sunnyui.common.3.9.7.nupkg.sha512",
+        "sunnyui.common.nuspec"
+      ]
+    }
+  },
+  "projectFileDependencyGroups": {
+    "net8.0-windows": [
+      "Newtonsoft.Json >= 13.0.3",
+      "SunnyUI >= 3.9.7"
+    ]
+  },
+  "packageFolders": {
+    "C:\\Users\\13740\\.nuget\\packages\\": {}
+  },
+  "project": {
+    "version": "1.0.0",
+    "restore": {
+      "projectUniqueName": "E:\\System\\Desktop\\AI中转\\FunAiGateway\\FunAiGateway.csproj",
+      "projectName": "FunAiGateway",
+      "projectPath": "E:\\System\\Desktop\\AI中转\\FunAiGateway\\FunAiGateway.csproj",
+      "packagesPath": "C:\\Users\\13740\\.nuget\\packages\\",
+      "outputPath": "E:\\System\\Desktop\\AI中转\\FunAiGateway\\obj\\",
+      "projectStyle": "PackageReference",
+      "configFilePaths": [
+        "C:\\Users\\13740\\AppData\\Roaming\\NuGet\\NuGet.Config",
+        "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
+      ],
+      "originalTargetFrameworks": [
+        "net8.0-windows"
+      ],
+      "sources": {
+        "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
+        "https://api.nuget.org/v3/index.json": {}
+      },
+      "frameworks": {
+        "net8.0-windows": {
+          "framework": "net8.0-windows7.0",
+          "targetAlias": "net8.0-windows",
+          "projectReferences": {}
+        }
+      },
+      "warningProperties": {
+        "warnAsError": [
+          "NU1605"
+        ]
+      },
+      "restoreAuditProperties": {
+        "enableAudit": "true",
+        "auditLevel": "low",
+        "auditMode": "direct"
+      },
+      "SdkAnalysisLevel": "10.0.300"
+    },
+    "frameworks": {
+      "net8.0-windows": {
+        "framework": "net8.0-windows7.0",
+        "targetAlias": "net8.0-windows",
+        "dependencies": {
+          "Newtonsoft.Json": {
+            "target": "Package",
+            "version": "[13.0.3, )"
+          },
+          "SunnyUI": {
+            "target": "Package",
+            "version": "[3.9.7, )"
+          }
+        },
+        "imports": [
+          "net461",
+          "net462",
+          "net47",
+          "net471",
+          "net472",
+          "net48",
+          "net481"
+        ],
+        "assetTargetFallback": true,
+        "warn": true,
+        "frameworkReferences": {
+          "Microsoft.NETCore.App": {
+            "privateAssets": "all"
+          },
+          "Microsoft.WindowsDesktop.App.WindowsForms": {
+            "privateAssets": "none"
+          }
+        },
+        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.301/PortableRuntimeIdentifierGraph.json"
+      }
+    }
+  }
+}

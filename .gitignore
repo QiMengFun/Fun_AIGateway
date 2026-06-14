@@ -10,6 +10,9 @@ obj/
 # 发布目录
 publish/
 
+# 本地脚本（不提交）
+*.bat
+
 # 运行时生成的文件
 config.json
 logs/

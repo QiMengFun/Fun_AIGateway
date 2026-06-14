@@ -101,25 +101,6 @@ message = client.messages.create(
 )
 ```
 
-## 文件结构
-
-```
-FunAiGateway/
-├── config.json          # 配置文件（自动生成）
-├── logs/                # 请求日志（按天分割）
-│   └── requests_YYYY-MM-DD.log
-├── MainForm.cs          # 主窗体逻辑
-├── MainForm.Designer.cs # 主窗体界面设计
-├── Models/
-│   └── Models.cs        # 数据模型定义
-├── Services/
-│   ├── ConfigService.cs # 配置与日志服务
-│   ├── ProxyServer.cs   # HTTP 代理服务器核心
-│   └── ProtocolConverter.cs # 协议转换器
-├── Forms/
-│   └── ChannelEditDialog.cs # 渠道编辑对话框
-└── publish.bat          # 发布编译脚本
-```
 
 ## License
 

@@ -80,5 +80,25 @@ namespace FunAiGateway.Models
         public int LogRetentionDays { get; set; } = 7;
         public int MaxLogCount { get; set; } = 500; // 日志最大保留条数，超过自动删除最早记录
         public bool AutoStartOnLaunch { get; set; } = false; // 启动软件时自动启动中转服务
+
+        // 日志显示颜色阈值配置
+        public LogColorConfig LogColor { get; set; } = new();
+    }
+
+    // 日志颜色阈值配置
+    public class LogColorConfig
+    {
+        // 响应时间阈值（毫秒）
+        public int DurationYellow { get; set; } = 30000;   // >30秒黄色
+        public int DurationOrange { get; set; } = 60000;   // >60秒橙色
+        public int DurationRed { get; set; } = 90000;      // >90秒红色
+
+        // 输入Token阈值
+        public int InputTokenOrange { get; set; } = 50000;  // >50000橙色
+        public int InputTokenRed { get; set; } = 100000;    // >100000红色
+
+        // 输出Token阈值
+        public int OutputTokenOrange { get; set; } = 100;   // >100橙色
+        public int OutputTokenRed { get; set; } = 200;      // >200红色
     }
 }

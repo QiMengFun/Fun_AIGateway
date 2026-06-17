@@ -1,12 +1,16 @@
 {
   "version": 2,
-  "dgSpecHash": "GJ5zhJvpkpg=",
+  "dgSpecHash": "JLTxB7AlGiI=",
   "success": true,
   "projectFilePath": "I:\\A源码存储\\CSharp商业项目\\AI中转\\FunAiGateway\\FunAiGateway.csproj",
   "expectedPackageFiles": [
+    "C:\\Users\\13740\\.nuget\\packages\\microsoft.net.illink.tasks\\8.0.28\\microsoft.net.illink.tasks.8.0.28.nupkg.sha512",
     "C:\\Users\\13740\\.nuget\\packages\\newtonsoft.json\\13.0.3\\newtonsoft.json.13.0.3.nupkg.sha512",
     "C:\\Users\\13740\\.nuget\\packages\\sunnyui\\3.9.7\\sunnyui.3.9.7.nupkg.sha512",
-    "C:\\Users\\13740\\.nuget\\packages\\sunnyui.common\\3.9.7\\sunnyui.common.3.9.7.nupkg.sha512"
+    "C:\\Users\\13740\\.nuget\\packages\\sunnyui.common\\3.9.7\\sunnyui.common.3.9.7.nupkg.sha512",
+    "C:\\Users\\13740\\.nuget\\packages\\microsoft.netcore.app.runtime.win-x64\\8.0.28\\microsoft.netcore.app.runtime.win-x64.8.0.28.nupkg.sha512",
+    "C:\\Users\\13740\\.nuget\\packages\\microsoft.windowsdesktop.app.runtime.win-x64\\8.0.28\\microsoft.windowsdesktop.app.runtime.win-x64.8.0.28.nupkg.sha512",
+    "C:\\Users\\13740\\.nuget\\packages\\microsoft.aspnetcore.app.runtime.win-x64\\8.0.28\\microsoft.aspnetcore.app.runtime.win-x64.8.0.28.nupkg.sha512"
   ],
   "logs": []
 }

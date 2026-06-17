@@ -48,18 +48,17 @@ namespace FunAiGateway
         private UIButton btnCopyModels;
 
         // 渠道页
-        private System.Windows.Forms.DataGridView dgvChannels;
+        private Sunny.UI.UIDataGridView dgvChannels;
         private UIButton btnAddChannel;
         private UIButton btnEditChannel;
         private UIButton btnDeleteChannel;
         private UIButton btnToggleChannel;
 
         // 日志页
-        private System.Windows.Forms.DataGridView dgvLogs;
+        private Sunny.UI.UIDataGridView dgvLogs;
         private UITextBox txtLogOutput;
         private UIButton btnClearLogs;
-        private UILabel lblMaxLogs;
-        private System.Windows.Forms.NumericUpDown numMaxLogs;
+        private UIButton btnLogSettings;
 
         // 状态栏
         private System.Windows.Forms.StatusStrip statusStrip;
@@ -76,6 +75,14 @@ namespace FunAiGateway
         {
             DataGridViewCellStyle dataGridViewCellStyle1 = new DataGridViewCellStyle();
             DataGridViewCellStyle dataGridViewCellStyle2 = new DataGridViewCellStyle();
+            DataGridViewCellStyle dataGridViewCellStyle3 = new DataGridViewCellStyle();
+            DataGridViewCellStyle dataGridViewCellStyle4 = new DataGridViewCellStyle();
+            DataGridViewCellStyle dataGridViewCellStyle5 = new DataGridViewCellStyle();
+            DataGridViewCellStyle dataGridViewCellStyle6 = new DataGridViewCellStyle();
+            DataGridViewCellStyle dataGridViewCellStyle7 = new DataGridViewCellStyle();
+            DataGridViewCellStyle dataGridViewCellStyle8 = new DataGridViewCellStyle();
+            DataGridViewCellStyle dataGridViewCellStyle9 = new DataGridViewCellStyle();
+            DataGridViewCellStyle dataGridViewCellStyle10 = new DataGridViewCellStyle();
             System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(MainForm));
             tabControl = new UITabControl();
             tabSettings = new TabPage();
@@ -110,17 +117,16 @@ namespace FunAiGateway
             txtModelsUrl = new UITextBox();
             btnCopyModels = new UIButton();
             tabChannels = new TabPage();
-            dgvChannels = new DataGridView();
+            dgvChannels = new UIDataGridView();
             btnAddChannel = new UIButton();
             btnEditChannel = new UIButton();
             btnDeleteChannel = new UIButton();
             btnToggleChannel = new UIButton();
             tabLogs = new TabPage();
-            dgvLogs = new DataGridView();
+            dgvLogs = new UIDataGridView();
             txtLogOutput = new UITextBox();
             btnClearLogs = new UIButton();
-            lblMaxLogs = new UILabel();
-            numMaxLogs = new NumericUpDown();
+            btnLogSettings = new UIButton();
             statusStrip = new StatusStrip();
             lblStatus = new ToolStripStatusLabel();
             lblRequestCount = new ToolStripStatusLabel();
@@ -134,7 +140,6 @@ namespace FunAiGateway
             ((System.ComponentModel.ISupportInitialize)dgvChannels).BeginInit();
             tabLogs.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)dgvLogs).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)numMaxLogs).BeginInit();
             statusStrip.SuspendLayout();
             SuspendLayout();
             // 
@@ -576,28 +581,55 @@ namespace FunAiGateway
             // 
             dgvChannels.AllowUserToAddRows = false;
             dgvChannels.AllowUserToDeleteRows = false;
+            dataGridViewCellStyle1.BackColor = Color.FromArgb(235, 243, 255);
+            dgvChannels.AlternatingRowsDefaultCellStyle = dataGridViewCellStyle1;
             dgvChannels.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
             dgvChannels.BackgroundColor = Color.White;
             dgvChannels.BorderStyle = BorderStyle.None;
             dgvChannels.CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal;
+            dgvChannels.ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.Single;
+            dataGridViewCellStyle2.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            dataGridViewCellStyle2.BackColor = Color.FromArgb(80, 160, 255);
+            dataGridViewCellStyle2.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
+            dataGridViewCellStyle2.ForeColor = Color.White;
+            dataGridViewCellStyle2.SelectionBackColor = SystemColors.Highlight;
+            dataGridViewCellStyle2.SelectionForeColor = SystemColors.HighlightText;
+            dataGridViewCellStyle2.WrapMode = DataGridViewTriState.True;
+            dgvChannels.ColumnHeadersDefaultCellStyle = dataGridViewCellStyle2;
             dgvChannels.ColumnHeadersHeight = 32;
             dgvChannels.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
-            dataGridViewCellStyle1.Alignment = DataGridViewContentAlignment.MiddleLeft;
-            dataGridViewCellStyle1.BackColor = SystemColors.Window;
-            dataGridViewCellStyle1.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
-            dataGridViewCellStyle1.ForeColor = Color.FromArgb(48, 48, 48);
-            dataGridViewCellStyle1.SelectionBackColor = Color.FromArgb(64, 158, 255);
-            dataGridViewCellStyle1.SelectionForeColor = Color.White;
-            dataGridViewCellStyle1.WrapMode = DataGridViewTriState.False;
-            dgvChannels.DefaultCellStyle = dataGridViewCellStyle1;
+            dataGridViewCellStyle3.Alignment = DataGridViewContentAlignment.MiddleLeft;
+            dataGridViewCellStyle3.BackColor = SystemColors.Window;
+            dataGridViewCellStyle3.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
+            dataGridViewCellStyle3.ForeColor = Color.FromArgb(48, 48, 48);
+            dataGridViewCellStyle3.SelectionBackColor = Color.FromArgb(64, 158, 255);
+            dataGridViewCellStyle3.SelectionForeColor = Color.White;
+            dataGridViewCellStyle3.WrapMode = DataGridViewTriState.False;
+            dgvChannels.DefaultCellStyle = dataGridViewCellStyle3;
+            dgvChannels.EnableHeadersVisualStyles = false;
+            dgvChannels.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
             dgvChannels.GridColor = Color.FromArgb(230, 230, 230);
             dgvChannels.Location = new Point(7, 43);
             dgvChannels.MultiSelect = false;
             dgvChannels.Name = "dgvChannels";
             dgvChannels.ReadOnly = true;
+            dgvChannels.RowHeadersBorderStyle = DataGridViewHeaderBorderStyle.Single;
+            dataGridViewCellStyle4.Alignment = DataGridViewContentAlignment.MiddleLeft;
+            dataGridViewCellStyle4.BackColor = Color.FromArgb(235, 243, 255);
+            dataGridViewCellStyle4.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
+            dataGridViewCellStyle4.ForeColor = Color.FromArgb(48, 48, 48);
+            dataGridViewCellStyle4.SelectionBackColor = Color.FromArgb(80, 160, 255);
+            dataGridViewCellStyle4.SelectionForeColor = Color.White;
+            dataGridViewCellStyle4.WrapMode = DataGridViewTriState.True;
+            dgvChannels.RowHeadersDefaultCellStyle = dataGridViewCellStyle4;
             dgvChannels.RowHeadersVisible = false;
+            dataGridViewCellStyle5.BackColor = Color.White;
+            dataGridViewCellStyle5.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
+            dgvChannels.RowsDefaultCellStyle = dataGridViewCellStyle5;
+            dgvChannels.SelectedIndex = -1;
             dgvChannels.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
             dgvChannels.Size = new Size(887, 466);
+            dgvChannels.StripeOddColor = Color.FromArgb(235, 243, 255);
             dgvChannels.TabIndex = 0;
             // 
             // btnAddChannel
@@ -649,11 +681,10 @@ namespace FunAiGateway
             tabLogs.Controls.Add(dgvLogs);
             tabLogs.Controls.Add(txtLogOutput);
             tabLogs.Controls.Add(btnClearLogs);
-            tabLogs.Controls.Add(lblMaxLogs);
-            tabLogs.Controls.Add(numMaxLogs);
+            tabLogs.Controls.Add(btnLogSettings);
             tabLogs.Location = new Point(0, 40);
             tabLogs.Name = "tabLogs";
-            tabLogs.Size = new Size(200, 60);
+            tabLogs.Size = new Size(900, 512);
             tabLogs.TabIndex = 2;
             tabLogs.Text = "请求日志";
             // 
@@ -661,29 +692,57 @@ namespace FunAiGateway
             // 
             dgvLogs.AllowUserToAddRows = false;
             dgvLogs.AllowUserToDeleteRows = false;
+            dataGridViewCellStyle6.BackColor = Color.FromArgb(235, 243, 255);
+            dgvLogs.AlternatingRowsDefaultCellStyle = dataGridViewCellStyle6;
             dgvLogs.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
             dgvLogs.BackgroundColor = Color.White;
             dgvLogs.BorderStyle = BorderStyle.None;
             dgvLogs.CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal;
+            dgvLogs.ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.Single;
+            dataGridViewCellStyle7.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            dataGridViewCellStyle7.BackColor = Color.FromArgb(80, 160, 255);
+            dataGridViewCellStyle7.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
+            dataGridViewCellStyle7.ForeColor = Color.White;
+            dataGridViewCellStyle7.SelectionBackColor = SystemColors.Highlight;
+            dataGridViewCellStyle7.SelectionForeColor = SystemColors.HighlightText;
+            dataGridViewCellStyle7.WrapMode = DataGridViewTriState.True;
+            dgvLogs.ColumnHeadersDefaultCellStyle = dataGridViewCellStyle7;
             dgvLogs.ColumnHeadersHeight = 26;
             dgvLogs.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
-            dataGridViewCellStyle2.Alignment = DataGridViewContentAlignment.MiddleLeft;
-            dataGridViewCellStyle2.BackColor = SystemColors.Window;
-            dataGridViewCellStyle2.Font = new Font("宋体", 9F, FontStyle.Regular, GraphicsUnit.Point, 134);
-            dataGridViewCellStyle2.ForeColor = Color.FromArgb(48, 48, 48);
-            dataGridViewCellStyle2.SelectionBackColor = Color.FromArgb(64, 158, 255);
-            dataGridViewCellStyle2.SelectionForeColor = Color.White;
-            dataGridViewCellStyle2.WrapMode = DataGridViewTriState.False;
-            dgvLogs.DefaultCellStyle = dataGridViewCellStyle2;
+            dataGridViewCellStyle8.Alignment = DataGridViewContentAlignment.MiddleLeft;
+            dataGridViewCellStyle8.BackColor = SystemColors.Window;
+            dataGridViewCellStyle8.Font = new Font("宋体", 9F, FontStyle.Regular, GraphicsUnit.Point, 134);
+            dataGridViewCellStyle8.ForeColor = Color.FromArgb(48, 48, 48);
+            dataGridViewCellStyle8.SelectionBackColor = SystemColors.Window;
+            dataGridViewCellStyle8.SelectionForeColor = Color.FromArgb(48, 48, 48);
+            dataGridViewCellStyle8.WrapMode = DataGridViewTriState.False;
+            dgvLogs.DefaultCellStyle = dataGridViewCellStyle8;
+            dgvLogs.EnableHeadersVisualStyles = false;
+            dgvLogs.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
             dgvLogs.GridColor = Color.FromArgb(230, 230, 230);
             dgvLogs.Location = new Point(8, 37);
             dgvLogs.Name = "dgvLogs";
             dgvLogs.ReadOnly = true;
+            dgvLogs.RowHeadersBorderStyle = DataGridViewHeaderBorderStyle.Single;
+            dataGridViewCellStyle9.Alignment = DataGridViewContentAlignment.MiddleLeft;
+            dataGridViewCellStyle9.BackColor = Color.FromArgb(235, 243, 255);
+            dataGridViewCellStyle9.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
+            dataGridViewCellStyle9.ForeColor = Color.FromArgb(48, 48, 48);
+            dataGridViewCellStyle9.SelectionBackColor = Color.FromArgb(80, 160, 255);
+            dataGridViewCellStyle9.SelectionForeColor = Color.White;
+            dataGridViewCellStyle9.WrapMode = DataGridViewTriState.True;
+            dgvLogs.RowHeadersDefaultCellStyle = dataGridViewCellStyle9;
             dgvLogs.RowHeadersVisible = false;
+            dataGridViewCellStyle10.BackColor = Color.White;
+            dataGridViewCellStyle10.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
+            dgvLogs.RowsDefaultCellStyle = dataGridViewCellStyle10;
             dgvLogs.RowTemplate.Height = 24;
-            dgvLogs.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+            dgvLogs.SelectedIndex = -1;
+            dgvLogs.SelectionMode = DataGridViewSelectionMode.CellSelect;
             dgvLogs.Size = new Size(887, 280);
+            dgvLogs.StripeOddColor = Color.FromArgb(235, 243, 255);
             dgvLogs.TabIndex = 0;
+            dgvLogs.TabStop = false;
             // 
             // txtLogOutput
             // 
@@ -712,26 +771,16 @@ namespace FunAiGateway
             btnClearLogs.Text = "清空日志";
             btnClearLogs.TipsFont = new Font("宋体", 9F, FontStyle.Regular, GraphicsUnit.Point, 134);
             // 
-            // lblMaxLogs
+            // btnLogSettings
             // 
-            lblMaxLogs.Font = new Font("宋体", 10F);
-            lblMaxLogs.ForeColor = Color.FromArgb(48, 48, 48);
-            lblMaxLogs.Location = new Point(560, 12);
-            lblMaxLogs.Name = "lblMaxLogs";
-            lblMaxLogs.Size = new Size(75, 18);
-            lblMaxLogs.TabIndex = 3;
-            lblMaxLogs.Text = "日志上限:";
-            lblMaxLogs.TextAlign = ContentAlignment.MiddleRight;
-            // 
-            // numMaxLogs
-            // 
-            numMaxLogs.Location = new Point(635, 8);
-            numMaxLogs.Maximum = new decimal(new int[] { 50000, 0, 0, 0 });
-            numMaxLogs.Minimum = new decimal(new int[] { 10, 0, 0, 0 });
-            numMaxLogs.Name = "numMaxLogs";
-            numMaxLogs.Size = new Size(80, 26);
-            numMaxLogs.TabIndex = 4;
-            numMaxLogs.Value = new decimal(new int[] { 500, 0, 0, 0 });
+            btnLogSettings.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
+            btnLogSettings.Location = new Point(8, 8);
+            btnLogSettings.MinimumSize = new Size(1, 1);
+            btnLogSettings.Name = "btnLogSettings";
+            btnLogSettings.Size = new Size(100, 23);
+            btnLogSettings.TabIndex = 5;
+            btnLogSettings.Text = "日志设置";
+            btnLogSettings.TipsFont = new Font("宋体", 9F, FontStyle.Regular, GraphicsUnit.Point, 134);
             // 
             // statusStrip
             // 
@@ -773,7 +822,6 @@ namespace FunAiGateway
             ((System.ComponentModel.ISupportInitialize)dgvChannels).EndInit();
             tabLogs.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)dgvLogs).EndInit();
-            ((System.ComponentModel.ISupportInitialize)numMaxLogs).EndInit();
             statusStrip.ResumeLayout(false);
             statusStrip.PerformLayout();
             ResumeLayout(false);

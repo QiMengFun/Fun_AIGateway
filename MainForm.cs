@@ -39,8 +39,13 @@ namespace FunAiGateway
             btnClearLogs.Click += BtnClearLogs_Click;
 
             // 日志上限变化时保存并裁剪已有日志
-            numMaxLogs.ValueChanged += (_, _) => AutoSaveSettings();
             dgvChannels.DoubleClick += BtnEditChannel_Click;
+
+            // 日志表格颜色格式化
+            dgvLogs.CellFormatting += DgvLogs_CellFormatting;
+
+            // 日志显示设置按钮
+            btnLogSettings.Click += BtnLogSettings_Click;
 
             // 复制按钮
             btnCopyOpenAI.Click += (_, _) => CopyToClipboard(txtOpenAIUrl.Text);
@@ -148,8 +153,6 @@ namespace FunAiGateway
             chkRequireApiKey.Checked = _configService.Config.RequireApiKey;
             txtApiKey.Text = _configService.Config.ApiKey;
             chkAutoStart.Checked = _configService.Config.AutoStartOnLaunch;
-            // 日志上限（安全限制范围）
-            numMaxLogs.Value = Math.Clamp(_configService.Config.MaxLogCount, (int)numMaxLogs.Minimum, (int)numMaxLogs.Maximum);
             RefreshDefaultModelCombo();
         }
 
@@ -180,18 +183,7 @@ namespace FunAiGateway
             _configService.Config.RequireApiKey = chkRequireApiKey.Checked;
             _configService.Config.ApiKey = txtApiKey.Text.Trim();
             _configService.Config.AutoStartOnLaunch = chkAutoStart.Checked;
-            // 保存日志上限并立即裁剪
-            var newMax = (int)numMaxLogs.Value;
-            var oldMax = _configService.Config.MaxLogCount;
-            _configService.Config.MaxLogCount = newMax;
             _configService.Save();
-            // 上限变小时立即裁剪已有日志（文件+内存缓冲）
-            if (newMax < oldMax)
-            {
-                _configService.TrimLogs(newMax);
-                while (_sessionLogs.Count > newMax)
-                    _sessionLogs.TryDequeue(out _);
-            }
         }
 
         private void BtnSaveSettings_Click(object? sender, EventArgs e)
@@ -328,6 +320,48 @@ namespace FunAiGateway
             RefreshChannels();
         }
 
+        private void DgvLogs_CellFormatting(object? sender, DataGridViewCellFormattingEventArgs e)
+        {
+            if (e.Value == null) return;
+            var row = dgvLogs.Rows[e.RowIndex];
+            var cfg = _configService.Config.LogColor;
+
+            // 响应时间颜色：默认绿色，>黄色阈值黄色，>橙色阈值橙色，>红色阈值红色
+            if (row.Cells["耗时s"]?.Value != null && double.TryParse(row.Cells["耗时s"].Value.ToString(), out var durationSec))
+            {
+                var durationMs = (long)(durationSec * 1000);
+                Color durationColor;
+                if (durationMs > cfg.DurationRed) { durationColor = Color.Red; }
+                else if (durationMs > cfg.DurationOrange) { durationColor = Color.Orange; }
+                else if (durationMs > cfg.DurationYellow) { durationColor = Color.YellowGreen; }
+                else { durationColor = Color.Green; }
+                row.Cells["耗时s"].Style.ForeColor = durationColor;
+                row.Cells["耗时s"].Style.SelectionForeColor = durationColor;
+            }
+
+            // 输入Token颜色：默认绿色，>橙色阈值橙色，>红色阈值红色
+            if (row.Cells["输入Token"]?.Value != null && int.TryParse(row.Cells["输入Token"].Value.ToString(), out var inputTokens))
+            {
+                Color inputColor;
+                if (inputTokens > cfg.InputTokenRed) { inputColor = Color.Red; }
+                else if (inputTokens > cfg.InputTokenOrange) { inputColor = Color.Orange; }
+                else { inputColor = Color.Green; }
+                row.Cells["输入Token"].Style.ForeColor = inputColor;
+                row.Cells["输入Token"].Style.SelectionForeColor = inputColor;
+            }
+
+            // 输出Token颜色：默认绿色，>橙色阈值橙色，>红色阈值红色
+            if (row.Cells["输出Token"]?.Value != null && int.TryParse(row.Cells["输出Token"].Value.ToString(), out var outputTokens))
+            {
+                Color outputColor;
+                if (outputTokens > cfg.OutputTokenRed) { outputColor = Color.Red; }
+                else if (outputTokens > cfg.OutputTokenOrange) { outputColor = Color.Orange; }
+                else { outputColor = Color.Green; }
+                row.Cells["输出Token"].Style.ForeColor = outputColor;
+                row.Cells["输出Token"].Style.SelectionForeColor = outputColor;
+            }
+        }
+
         private void RefreshLogs()
         {
             var logs = _sessionLogs.ToList();
@@ -337,18 +371,27 @@ namespace FunAiGateway
             {
                 时间 = l.Time.ToString("HH:mm:ss"),
                 渠道 = l.ChannelName,
-                模型 = l.ModelName,
                 协议 = $"{l.RequestProtocol}→{l.TargetProtocol}",
                 输入Token = l.InputTokens,
                 输出Token = l.OutputTokens,
-                耗时ms = l.DurationMs,
+                耗时s = Math.Round(l.DurationMs / 1000.0, 1),
                 状态 = l.Success ? "成功" : "失败"
             }).ToList();
+            // 调整列宽
+            if (dgvLogs.Columns["时间"] != null) { dgvLogs.Columns["时间"]!.Width = 95; dgvLogs.Columns["时间"]!.AutoSizeMode = DataGridViewAutoSizeColumnMode.None; }
+            if (dgvLogs.Columns["渠道"] != null) { dgvLogs.Columns["渠道"]!.Width = 215; dgvLogs.Columns["渠道"]!.AutoSizeMode = DataGridViewAutoSizeColumnMode.None; }
+            if (dgvLogs.Columns["协议"] != null) { dgvLogs.Columns["协议"]!.Width = 240; dgvLogs.Columns["协议"]!.AutoSizeMode = DataGridViewAutoSizeColumnMode.None; }
+            if (dgvLogs.Columns["输入Token"] != null) { dgvLogs.Columns["输入Token"]!.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill; }
+            if (dgvLogs.Columns["输出Token"] != null) { dgvLogs.Columns["输出Token"]!.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill; }
+            if (dgvLogs.Columns["耗时s"] != null) { dgvLogs.Columns["耗时s"]!.Width = 90; dgvLogs.Columns["耗时s"]!.AutoSizeMode = DataGridViewAutoSizeColumnMode.None; }
+            if (dgvLogs.Columns["状态"] != null) { dgvLogs.Columns["状态"]!.Width = 60; dgvLogs.Columns["状态"]!.AutoSizeMode = DataGridViewAutoSizeColumnMode.None; }
             // 滚动到最后一行（最新记录）
             if (dgvLogs.Rows.Count > 0)
             {
                 dgvLogs.FirstDisplayedScrollingRowIndex = dgvLogs.Rows.Count - 1;
             }
+            // 清除选中状态，避免出现焦点
+            dgvLogs.ClearSelection();
         }
 
         private void BtnClearLogs_Click(object? sender, EventArgs e)
@@ -356,6 +399,31 @@ namespace FunAiGateway
             // 仅清空当前会话内存缓冲（不影响已写入文件的日志）
             while (_sessionLogs.TryDequeue(out _)) { }
             RefreshLogs();
+        }
+
+        private void BtnLogSettings_Click(object? sender, EventArgs e)
+        {
+            using var dlg = new LogSettingsDialog(_configService.Config.LogColor, _configService.Config.MaxLogCount);
+            if (dlg.ShowDialog(this) == DialogResult.OK)
+            {
+                // 保存颜色阈值配置
+                _configService.Config.LogColor = dlg.LogColor;
+                // 保存日志上限并裁剪
+                var newMax = dlg.MaxLogCount;
+                var oldMax = _configService.Config.MaxLogCount;
+                _configService.Config.MaxLogCount = newMax;
+                _configService.Save();
+                // 上限变小时立即裁剪已有日志（文件+内存缓冲）
+                if (newMax < oldMax)
+                {
+                    _configService.TrimLogs(newMax);
+                    while (_sessionLogs.Count > newMax)
+                        _sessionLogs.TryDequeue(out _);
+                }
+                // 刷新日志显示以应用新的颜色配置
+                RefreshLogs();
+                this.ShowInfoTip("显示设置已保存");
+            }
         }
 
         private void OnRequestLogged(RequestLog log)

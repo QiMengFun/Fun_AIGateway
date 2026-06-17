@@ -30,7 +30,11 @@ namespace FunAiGateway.Services
                 PooledConnectionLifetime = TimeSpan.FromMinutes(5),
                 PooledConnectionIdleTimeout = TimeSpan.FromMinutes(2),
                 MaxConnectionsPerServer = 100
-            });
+            })
+            {
+                // 超时由 CancellationToken 控制，HttpClient 自身不设超时限制
+                Timeout = System.Threading.Timeout.InfiniteTimeSpan
+            };
         }
 
         // 根据渠道代理设置获取 HttpClient，未启用代理时返回共享实例
@@ -42,6 +46,14 @@ namespace FunAiGateway.Services
 
             var key = $"{channel.ProxyType}|{channel.ProxyHost}|{channel.ProxyUsername}|{channel.ProxyPassword}";
             return _proxyClients.GetOrAdd(key, _ => CreateProxyClient(channel));
+        }
+
+        // 创建带渠道超时的 CancellationToken，避免修改共享 HttpClient 的 Timeout 属性
+        private CancellationTokenSource CreateTimeoutCts(CancellationToken ct, int timeoutSeconds)
+        {
+            var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            cts.CancelAfter(TimeSpan.FromSeconds(timeoutSeconds));
+            return cts;
         }
 
         // 创建带代理的 HttpClient
@@ -87,7 +99,11 @@ namespace FunAiGateway.Services
                 };
             }
 
-            return new HttpClient(handler);
+            return new HttpClient(handler)
+            {
+                // 超时由 CancellationToken 控制，HttpClient 自身不设超时限制
+                Timeout = System.Threading.Timeout.InfiniteTimeSpan
+            };
         }
 
         // 解析 host:port 格式
@@ -349,7 +365,11 @@ namespace FunAiGateway.Services
             }
             finally
             {
-                OnRequestLogged?.Invoke(requestLog);
+                // 未知协议（404等）不记录请求次数和日志
+                if (requestLog.RequestProtocol != "Unknown")
+                {
+                    OnRequestLogged?.Invoke(requestLog);
+                }
                 try { response.Close(); } catch { }
             }
         }
@@ -724,11 +744,12 @@ namespace FunAiGateway.Services
 
             req.Content = new StringContent(reqBody.ToString(Formatting.None), System.Text.Encoding.UTF8, "application/json");
 
-            using var resp = await GetHttpClient(channel).SendAsync(req, isStream ? HttpCompletionOption.ResponseHeadersRead : HttpCompletionOption.ResponseContentRead, ct);
+            using var timeoutCts = CreateTimeoutCts(ct, channel.Timeout);
+            using var resp = await GetHttpClient(channel).SendAsync(req, isStream ? HttpCompletionOption.ResponseHeadersRead : HttpCompletionOption.ResponseContentRead, timeoutCts.Token);
 
             if (!isStream)
             {
-                var respBody = await resp.Content.ReadAsStringAsync(ct);
+                var respBody = await resp.Content.ReadAsStringAsync(timeoutCts.Token);
                 context.Response.StatusCode = (int)resp.StatusCode;
                 context.Response.ContentType = "application/json";
                 await context.Response.OutputStream.WriteAsync(System.Text.Encoding.UTF8.GetBytes(respBody), ct);
@@ -748,7 +769,7 @@ namespace FunAiGateway.Services
                 context.Response.Headers.Add("Cache-Control", "no-cache");
                 context.Response.Headers.Add("Connection", "keep-alive");
 
-                using var stream = await resp.Content.ReadAsStreamAsync(ct);
+                using var stream = await resp.Content.ReadAsStreamAsync(timeoutCts.Token);
                 await StreamAndExtractUsageAsync(stream, context.Response.OutputStream, requestLog, false, ct);
             }
         }
@@ -764,11 +785,12 @@ namespace FunAiGateway.Services
 
             req.Content = new StringContent(reqBody.ToString(Formatting.None), System.Text.Encoding.UTF8, "application/json");
 
-            using var resp = await GetHttpClient(channel).SendAsync(req, isStream ? HttpCompletionOption.ResponseHeadersRead : HttpCompletionOption.ResponseContentRead, ct);
+            using var timeoutCts = CreateTimeoutCts(ct, channel.Timeout);
+            using var resp = await GetHttpClient(channel).SendAsync(req, isStream ? HttpCompletionOption.ResponseHeadersRead : HttpCompletionOption.ResponseContentRead, timeoutCts.Token);
 
             if (!isStream)
             {
-                var respBody = await resp.Content.ReadAsStringAsync(ct);
+                var respBody = await resp.Content.ReadAsStringAsync(timeoutCts.Token);
                 context.Response.StatusCode = (int)resp.StatusCode;
                 context.Response.ContentType = "application/json";
                 await context.Response.OutputStream.WriteAsync(System.Text.Encoding.UTF8.GetBytes(respBody), ct);
@@ -787,7 +809,7 @@ namespace FunAiGateway.Services
                 context.Response.ContentType = "text/event-stream";
                 context.Response.Headers.Add("Cache-Control", "no-cache");
 
-                using var stream = await resp.Content.ReadAsStreamAsync(ct);
+                using var stream = await resp.Content.ReadAsStreamAsync(timeoutCts.Token);
                 await StreamAndExtractUsageAsync(stream, context.Response.OutputStream, requestLog, true, ct);
             }
         }
@@ -801,7 +823,8 @@ namespace FunAiGateway.Services
             AddCustomHeaders(req, channel);
             req.Content = new StringContent(anthropicReq.ToString(Formatting.None), System.Text.Encoding.UTF8, "application/json");
 
-            using var resp = await GetHttpClient(channel).SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct);
+            using var timeoutCts = CreateTimeoutCts(ct, channel.Timeout);
+            using var resp = await GetHttpClient(channel).SendAsync(req, HttpCompletionOption.ResponseHeadersRead, timeoutCts.Token);
             context.Response.StatusCode = (int)resp.StatusCode;
             context.Response.ContentType = "text/event-stream";
             context.Response.Headers.Add("Cache-Control", "no-cache");
@@ -809,7 +832,7 @@ namespace FunAiGateway.Services
 
             var requestId = $"chatcmpl-{Guid.NewGuid():N}";
 
-            using var stream = await resp.Content.ReadAsStreamAsync(ct);
+            using var stream = await resp.Content.ReadAsStreamAsync(timeoutCts.Token);
             using var reader = new StreamReader(stream);
             while (!reader.EndOfStream && !ct.IsCancellationRequested)
             {
@@ -835,7 +858,8 @@ namespace FunAiGateway.Services
             AddCustomHeaders(req, channel);
             req.Content = new StringContent(openaiReq.ToString(Formatting.None), System.Text.Encoding.UTF8, "application/json");
 
-            using var resp = await GetHttpClient(channel).SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct);
+            using var timeoutCts = CreateTimeoutCts(ct, channel.Timeout);
+            using var resp = await GetHttpClient(channel).SendAsync(req, HttpCompletionOption.ResponseHeadersRead, timeoutCts.Token);
             context.Response.StatusCode = (int)resp.StatusCode;
             context.Response.ContentType = "text/event-stream";
             context.Response.Headers.Add("Cache-Control", "no-cache");
@@ -861,7 +885,7 @@ namespace FunAiGateway.Services
             var blockStart = "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\n";
             await context.Response.OutputStream.WriteAsync(System.Text.Encoding.UTF8.GetBytes(blockStart), 0, blockStart.Length, ct);
 
-            using var stream = await resp.Content.ReadAsStreamAsync(ct);
+            using var stream = await resp.Content.ReadAsStreamAsync(timeoutCts.Token);
             using var reader = new StreamReader(stream);
             while (!reader.EndOfStream && !ct.IsCancellationRequested)
             {
@@ -898,8 +922,9 @@ namespace FunAiGateway.Services
             AddCustomHeaders(req, channel);
             req.Content = new StringContent(reqBody.ToString(Formatting.None), System.Text.Encoding.UTF8, "application/json");
 
-            using var resp = await GetHttpClient(channel).SendAsync(req, ct);
-            var body = await resp.Content.ReadAsStringAsync(ct);
+            using var timeoutCts = CreateTimeoutCts(ct, channel.Timeout);
+            using var resp = await GetHttpClient(channel).SendAsync(req, timeoutCts.Token);
+            var body = await resp.Content.ReadAsStringAsync(timeoutCts.Token);
             return (JObject.Parse(body), (int)resp.StatusCode);
         }
 
@@ -912,8 +937,9 @@ namespace FunAiGateway.Services
             AddCustomHeaders(req, channel);
             req.Content = new StringContent(reqBody.ToString(Formatting.None), System.Text.Encoding.UTF8, "application/json");
 
-            using var resp = await GetHttpClient(channel).SendAsync(req, ct);
-            var body = await resp.Content.ReadAsStringAsync(ct);
+            using var timeoutCts = CreateTimeoutCts(ct, channel.Timeout);
+            using var resp = await GetHttpClient(channel).SendAsync(req, timeoutCts.Token);
+            var body = await resp.Content.ReadAsStringAsync(timeoutCts.Token);
             return (JObject.Parse(body), (int)resp.StatusCode);
         }
 

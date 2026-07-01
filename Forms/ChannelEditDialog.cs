@@ -13,12 +13,6 @@ namespace FunAiGateway.Forms
 
         private UILabel lblName;
         private UITextBox txtName;
-        private UILabel lblType;
-        private UIComboBox cmbType;
-        private UILabel lblBaseUrlLabel;
-        private UITextBox txtBaseUrl;
-        private UILabel lblApiKey;
-        private UITextBox txtApiKey;
         private UILabel lblRealModelName;
         private UITextBox txtRealModelName;
         private UILabel lblContextLength;
@@ -35,6 +29,18 @@ namespace FunAiGateway.Forms
         private UICheckBox chkSupportStream;
         private UICheckBox chkSupportVision;
         private UICheckBox chkSupportFunctionCalling;
+        // OpenAI 协议端点控件
+        private UIGroupBox grpOpenAI;
+        private UILabel lblOpenAIBaseUrl;
+        private UITextBox txtOpenAIBaseUrl;
+        private UILabel lblOpenAIApiKey;
+        private UITextBox txtOpenAIApiKey;
+        // Anthropic 协议端点控件
+        private UIGroupBox grpAnthropic;
+        private UILabel lblAnthropicBaseUrl;
+        private UITextBox txtAnthropicBaseUrl;
+        private UILabel lblAnthropicApiKey;
+        private UITextBox txtAnthropicApiKey;
         // 代理设置控件
         private UICheckBox chkProxyEnabled;
         private UILabel lblProxyType;
@@ -61,9 +67,10 @@ namespace FunAiGateway.Forms
             {
                 _editingId = existing.Id;
                 txtName.Text = existing.Name;
-                cmbType.SelectedIndex = (int)existing.Type;
-                txtBaseUrl.Text = existing.BaseUrl;
-                txtApiKey.Text = existing.ApiKey;
+                txtOpenAIBaseUrl.Text = existing.OpenAIBaseUrl;
+                txtOpenAIApiKey.Text = existing.OpenAIApiKey;
+                txtAnthropicBaseUrl.Text = existing.AnthropicBaseUrl;
+                txtAnthropicApiKey.Text = existing.AnthropicApiKey;
                 numTimeout.Value = existing.Timeout;
                 numRetryCount.Value = existing.RetryCount;
                 chkEnabled.Checked = existing.Enabled;
@@ -89,7 +96,6 @@ namespace FunAiGateway.Forms
             }
             else
             {
-                cmbType.SelectedIndex = 0;
                 cmbProxyType.SelectedIndex = 0;
                 Text = "添加渠道";
             }
@@ -104,9 +110,13 @@ namespace FunAiGateway.Forms
                 this.ShowWarningDialog("请输入模型名称");
                 return;
             }
-            if (string.IsNullOrWhiteSpace(txtBaseUrl.Text))
+
+            var openAIBaseUrl = txtOpenAIBaseUrl.Text.Trim();
+            var anthropicBaseUrl = txtAnthropicBaseUrl.Text.Trim();
+            // 至少需要一个协议端点的 BaseUrl 不为空
+            if (string.IsNullOrWhiteSpace(openAIBaseUrl) && string.IsNullOrWhiteSpace(anthropicBaseUrl))
             {
-                this.ShowWarningDialog("请输入Base URL");
+                this.ShowWarningDialog("请至少填写一个协议端点的 Base URL");
                 return;
             }
 
@@ -130,9 +140,11 @@ namespace FunAiGateway.Forms
             {
                 Id = _editingId ?? Guid.NewGuid().ToString(),
                 Name = name,
-                Type = (ChannelType)cmbType.SelectedIndex,
-                BaseUrl = txtBaseUrl.Text.Trim(),
-                ApiKey = txtApiKey.Text.Trim(),
+                OpenAIBaseUrl = openAIBaseUrl,
+                OpenAIApiKey = txtOpenAIApiKey.Text.Trim(),
+                AnthropicBaseUrl = anthropicBaseUrl,
+                AnthropicApiKey = txtAnthropicApiKey.Text.Trim(),
+                // 旧字段 BaseUrl/ApiKey 留空（不再使用）
                 Timeout = (int)numTimeout.Value,
                 RetryCount = (int)numRetryCount.Value,
                 Enabled = chkEnabled.Checked,
@@ -167,12 +179,6 @@ namespace FunAiGateway.Forms
             System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(ChannelEditDialog));
             lblName = new UILabel();
             txtName = new UITextBox();
-            lblType = new UILabel();
-            cmbType = new UIComboBox();
-            lblBaseUrlLabel = new UILabel();
-            txtBaseUrl = new UITextBox();
-            lblApiKey = new UILabel();
-            txtApiKey = new UITextBox();
             lblRealModelName = new UILabel();
             txtRealModelName = new UITextBox();
             lblContextLength = new UILabel();
@@ -189,6 +195,16 @@ namespace FunAiGateway.Forms
             chkSupportStream = new UICheckBox();
             chkSupportVision = new UICheckBox();
             chkSupportFunctionCalling = new UICheckBox();
+            grpOpenAI = new UIGroupBox();
+            lblOpenAIBaseUrl = new UILabel();
+            txtOpenAIBaseUrl = new UITextBox();
+            lblOpenAIApiKey = new UILabel();
+            txtOpenAIApiKey = new UITextBox();
+            grpAnthropic = new UIGroupBox();
+            lblAnthropicBaseUrl = new UILabel();
+            txtAnthropicBaseUrl = new UITextBox();
+            lblAnthropicApiKey = new UILabel();
+            txtAnthropicApiKey = new UITextBox();
             chkProxyEnabled = new UICheckBox();
             lblProxyType = new UILabel();
             cmbProxyType = new UIComboBox();
@@ -205,6 +221,8 @@ namespace FunAiGateway.Forms
             ((System.ComponentModel.ISupportInitialize)numMaxOutputTokens).BeginInit();
             ((System.ComponentModel.ISupportInitialize)numTimeout).BeginInit();
             ((System.ComponentModel.ISupportInitialize)numRetryCount).BeginInit();
+            grpOpenAI.SuspendLayout();
+            grpAnthropic.SuspendLayout();
             uiGroupBox1.SuspendLayout();
             SuspendLayout();
             // 
@@ -232,105 +250,27 @@ namespace FunAiGateway.Forms
             txtName.TextAlignment = ContentAlignment.MiddleLeft;
             txtName.Watermark = "";
             // 
-            // lblType
-            // 
-            lblType.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
-            lblType.ForeColor = Color.FromArgb(48, 48, 48);
-            lblType.Location = new Point(20, 89);
-            lblType.Name = "lblType";
-            lblType.Size = new Size(90, 23);
-            lblType.TabIndex = 2;
-            lblType.Text = "协议类型:";
-            // 
-            // cmbType
-            // 
-            cmbType.DataSource = null;
-            cmbType.DropDownStyle = UIDropDownStyle.DropDownList;
-            cmbType.FillColor = Color.White;
-            cmbType.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
-            cmbType.ItemHoverColor = Color.FromArgb(155, 200, 255);
-            cmbType.Items.AddRange(new object[] { "OpenAI", "Anthropic" });
-            cmbType.ItemSelectForeColor = Color.FromArgb(235, 243, 255);
-            cmbType.Location = new Point(120, 86);
-            cmbType.Margin = new Padding(4, 5, 4, 5);
-            cmbType.MinimumSize = new Size(63, 0);
-            cmbType.Name = "cmbType";
-            cmbType.Padding = new Padding(0, 0, 30, 2);
-            cmbType.Size = new Size(360, 29);
-            cmbType.SymbolSize = 24;
-            cmbType.TabIndex = 3;
-            cmbType.TextAlignment = ContentAlignment.MiddleLeft;
-            cmbType.Watermark = "";
-            // 
-            // lblBaseUrlLabel
-            // 
-            lblBaseUrlLabel.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
-            lblBaseUrlLabel.ForeColor = Color.FromArgb(48, 48, 48);
-            lblBaseUrlLabel.Location = new Point(20, 134);
-            lblBaseUrlLabel.Name = "lblBaseUrlLabel";
-            lblBaseUrlLabel.Size = new Size(90, 23);
-            lblBaseUrlLabel.TabIndex = 4;
-            lblBaseUrlLabel.Text = "Base URL:";
-            // 
-            // txtBaseUrl
-            // 
-            txtBaseUrl.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
-            txtBaseUrl.Location = new Point(120, 131);
-            txtBaseUrl.Margin = new Padding(4, 5, 4, 5);
-            txtBaseUrl.MinimumSize = new Size(1, 16);
-            txtBaseUrl.Name = "txtBaseUrl";
-            txtBaseUrl.Padding = new Padding(5);
-            txtBaseUrl.ShowText = false;
-            txtBaseUrl.Size = new Size(360, 29);
-            txtBaseUrl.TabIndex = 5;
-            txtBaseUrl.TextAlignment = ContentAlignment.MiddleLeft;
-            txtBaseUrl.Watermark = "如 https://api.openai.com/v1";
-            // 
-            // lblApiKey
-            // 
-            lblApiKey.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
-            lblApiKey.ForeColor = Color.FromArgb(48, 48, 48);
-            lblApiKey.Location = new Point(20, 179);
-            lblApiKey.Name = "lblApiKey";
-            lblApiKey.Size = new Size(90, 23);
-            lblApiKey.TabIndex = 6;
-            lblApiKey.Text = "API Key:";
-            // 
-            // txtApiKey
-            // 
-            txtApiKey.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
-            txtApiKey.Location = new Point(120, 176);
-            txtApiKey.Margin = new Padding(4, 5, 4, 5);
-            txtApiKey.MinimumSize = new Size(1, 16);
-            txtApiKey.Name = "txtApiKey";
-            txtApiKey.Padding = new Padding(5);
-            txtApiKey.ShowText = false;
-            txtApiKey.Size = new Size(360, 29);
-            txtApiKey.TabIndex = 7;
-            txtApiKey.TextAlignment = ContentAlignment.MiddleLeft;
-            txtApiKey.Watermark = "";
-            // 
             // lblRealModelName
             // 
             lblRealModelName.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
             lblRealModelName.ForeColor = Color.FromArgb(48, 48, 48);
-            lblRealModelName.Location = new Point(20, 224);
+            lblRealModelName.Location = new Point(20, 92);
             lblRealModelName.Name = "lblRealModelName";
             lblRealModelName.Size = new Size(90, 23);
-            lblRealModelName.TabIndex = 8;
+            lblRealModelName.TabIndex = 2;
             lblRealModelName.Text = "实际模型名:";
             // 
             // txtRealModelName
             // 
             txtRealModelName.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
-            txtRealModelName.Location = new Point(120, 221);
+            txtRealModelName.Location = new Point(120, 89);
             txtRealModelName.Margin = new Padding(4, 5, 4, 5);
             txtRealModelName.MinimumSize = new Size(1, 16);
             txtRealModelName.Name = "txtRealModelName";
             txtRealModelName.Padding = new Padding(5);
             txtRealModelName.ShowText = false;
             txtRealModelName.Size = new Size(360, 29);
-            txtRealModelName.TabIndex = 9;
+            txtRealModelName.TabIndex = 3;
             txtRealModelName.TextAlignment = ContentAlignment.MiddleLeft;
             txtRealModelName.Watermark = "";
             // 
@@ -338,103 +278,103 @@ namespace FunAiGateway.Forms
             // 
             lblContextLength.Font = new Font("宋体", 11F);
             lblContextLength.ForeColor = Color.FromArgb(48, 48, 48);
-            lblContextLength.Location = new Point(20, 269);
+            lblContextLength.Location = new Point(20, 137);
             lblContextLength.Name = "lblContextLength";
             lblContextLength.Size = new Size(94, 23);
-            lblContextLength.TabIndex = 10;
+            lblContextLength.TabIndex = 4;
             lblContextLength.Text = "上下文长度:";
             // 
             // numContextLength
             // 
-            numContextLength.Location = new Point(120, 266);
+            numContextLength.Location = new Point(120, 134);
             numContextLength.Maximum = new decimal(new int[] { 2000000, 0, 0, 0 });
             numContextLength.Name = "numContextLength";
             numContextLength.Size = new Size(100, 26);
-            numContextLength.TabIndex = 11;
+            numContextLength.TabIndex = 5;
             numContextLength.Value = new decimal(new int[] { 128000, 0, 0, 0 });
             // 
             // lblMaxOutputTokens
             // 
             lblMaxOutputTokens.Font = new Font("宋体", 11F);
             lblMaxOutputTokens.ForeColor = Color.FromArgb(48, 48, 48);
-            lblMaxOutputTokens.Location = new Point(253, 269);
+            lblMaxOutputTokens.Location = new Point(253, 137);
             lblMaxOutputTokens.Name = "lblMaxOutputTokens";
             lblMaxOutputTokens.Size = new Size(87, 23);
-            lblMaxOutputTokens.TabIndex = 12;
+            lblMaxOutputTokens.TabIndex = 6;
             lblMaxOutputTokens.Text = "最大输出:";
             // 
             // numMaxOutputTokens
             // 
-            numMaxOutputTokens.Location = new Point(346, 266);
+            numMaxOutputTokens.Location = new Point(346, 134);
             numMaxOutputTokens.Maximum = new decimal(new int[] { 2000000, 0, 0, 0 });
             numMaxOutputTokens.Name = "numMaxOutputTokens";
             numMaxOutputTokens.Size = new Size(100, 26);
-            numMaxOutputTokens.TabIndex = 13;
+            numMaxOutputTokens.TabIndex = 7;
             numMaxOutputTokens.Value = new decimal(new int[] { 16000, 0, 0, 0 });
             // 
             // lblTimeout
             // 
             lblTimeout.Font = new Font("宋体", 11F);
             lblTimeout.ForeColor = Color.FromArgb(48, 48, 48);
-            lblTimeout.Location = new Point(22, 314);
+            lblTimeout.Location = new Point(22, 182);
             lblTimeout.Name = "lblTimeout";
             lblTimeout.Size = new Size(90, 23);
-            lblTimeout.TabIndex = 14;
+            lblTimeout.TabIndex = 8;
             lblTimeout.Text = "超时(秒):";
             // 
             // numTimeout
             // 
-            numTimeout.Location = new Point(120, 311);
+            numTimeout.Location = new Point(120, 179);
             numTimeout.Maximum = new decimal(new int[] { 600, 0, 0, 0 });
             numTimeout.Name = "numTimeout";
             numTimeout.Size = new Size(80, 26);
-            numTimeout.TabIndex = 15;
+            numTimeout.TabIndex = 9;
             numTimeout.Value = new decimal(new int[] { 300, 0, 0, 0 });
             // 
             // lblRetryCount
             // 
             lblRetryCount.Font = new Font("宋体", 11F);
             lblRetryCount.ForeColor = Color.FromArgb(48, 48, 48);
-            lblRetryCount.Location = new Point(220, 314);
+            lblRetryCount.Location = new Point(220, 182);
             lblRetryCount.Name = "lblRetryCount";
             lblRetryCount.Size = new Size(82, 23);
-            lblRetryCount.TabIndex = 16;
+            lblRetryCount.TabIndex = 10;
             lblRetryCount.Text = "重试次数:";
             // 
             // numRetryCount
             // 
-            numRetryCount.Location = new Point(308, 311);
+            numRetryCount.Location = new Point(308, 179);
             numRetryCount.Maximum = new decimal(new int[] { 10, 0, 0, 0 });
             numRetryCount.Name = "numRetryCount";
             numRetryCount.Size = new Size(80, 26);
-            numRetryCount.TabIndex = 17;
+            numRetryCount.TabIndex = 11;
             // 
             // chkEnabled
             // 
             chkEnabled.Checked = true;
             chkEnabled.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
             chkEnabled.ForeColor = Color.FromArgb(48, 48, 48);
-            chkEnabled.Location = new Point(400, 311);
+            chkEnabled.Location = new Point(400, 179);
             chkEnabled.MinimumSize = new Size(1, 1);
             chkEnabled.Name = "chkEnabled";
             chkEnabled.Size = new Size(80, 29);
-            chkEnabled.TabIndex = 18;
+            chkEnabled.TabIndex = 12;
             chkEnabled.Text = "启用";
             // 
             // lblCustomHeaders
             // 
             lblCustomHeaders.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
             lblCustomHeaders.ForeColor = Color.FromArgb(48, 48, 48);
-            lblCustomHeaders.Location = new Point(20, 399);
+            lblCustomHeaders.Location = new Point(20, 267);
             lblCustomHeaders.Name = "lblCustomHeaders";
             lblCustomHeaders.Size = new Size(90, 23);
-            lblCustomHeaders.TabIndex = 22;
+            lblCustomHeaders.TabIndex = 16;
             lblCustomHeaders.Text = "自定义头:";
             // 
             // txtCustomHeaders
             // 
             txtCustomHeaders.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
-            txtCustomHeaders.Location = new Point(120, 396);
+            txtCustomHeaders.Location = new Point(120, 264);
             txtCustomHeaders.Margin = new Padding(4, 5, 4, 5);
             txtCustomHeaders.MinimumSize = new Size(1, 16);
             txtCustomHeaders.Multiline = true;
@@ -442,7 +382,7 @@ namespace FunAiGateway.Forms
             txtCustomHeaders.Padding = new Padding(5);
             txtCustomHeaders.ShowText = false;
             txtCustomHeaders.Size = new Size(360, 60);
-            txtCustomHeaders.TabIndex = 23;
+            txtCustomHeaders.TabIndex = 17;
             txtCustomHeaders.TextAlignment = ContentAlignment.MiddleLeft;
             txtCustomHeaders.Watermark = "";
             // 
@@ -451,22 +391,22 @@ namespace FunAiGateway.Forms
             chkSupportStream.Checked = true;
             chkSupportStream.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
             chkSupportStream.ForeColor = Color.FromArgb(48, 48, 48);
-            chkSupportStream.Location = new Point(20, 357);
+            chkSupportStream.Location = new Point(20, 225);
             chkSupportStream.MinimumSize = new Size(1, 1);
             chkSupportStream.Name = "chkSupportStream";
             chkSupportStream.Size = new Size(90, 29);
-            chkSupportStream.TabIndex = 19;
+            chkSupportStream.TabIndex = 13;
             chkSupportStream.Text = "支持流式";
             // 
             // chkSupportVision
             // 
             chkSupportVision.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
             chkSupportVision.ForeColor = Color.FromArgb(48, 48, 48);
-            chkSupportVision.Location = new Point(120, 357);
+            chkSupportVision.Location = new Point(120, 225);
             chkSupportVision.MinimumSize = new Size(1, 1);
             chkSupportVision.Name = "chkSupportVision";
             chkSupportVision.Size = new Size(90, 29);
-            chkSupportVision.TabIndex = 20;
+            chkSupportVision.TabIndex = 14;
             chkSupportVision.Text = "支持视觉";
             // 
             // chkSupportFunctionCalling
@@ -474,12 +414,142 @@ namespace FunAiGateway.Forms
             chkSupportFunctionCalling.Checked = true;
             chkSupportFunctionCalling.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
             chkSupportFunctionCalling.ForeColor = Color.FromArgb(48, 48, 48);
-            chkSupportFunctionCalling.Location = new Point(220, 357);
+            chkSupportFunctionCalling.Location = new Point(220, 225);
             chkSupportFunctionCalling.MinimumSize = new Size(1, 1);
             chkSupportFunctionCalling.Name = "chkSupportFunctionCalling";
             chkSupportFunctionCalling.Size = new Size(120, 29);
-            chkSupportFunctionCalling.TabIndex = 21;
+            chkSupportFunctionCalling.TabIndex = 15;
             chkSupportFunctionCalling.Text = "支持函数调用";
+            // 
+            // grpOpenAI
+            // 
+            grpOpenAI.Controls.Add(lblOpenAIBaseUrl);
+            grpOpenAI.Controls.Add(txtOpenAIBaseUrl);
+            grpOpenAI.Controls.Add(lblOpenAIApiKey);
+            grpOpenAI.Controls.Add(txtOpenAIApiKey);
+            grpOpenAI.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
+            grpOpenAI.Location = new Point(4, 332);
+            grpOpenAI.Margin = new Padding(4, 5, 4, 5);
+            grpOpenAI.MinimumSize = new Size(1, 1);
+            grpOpenAI.Name = "grpOpenAI";
+            grpOpenAI.Padding = new Padding(0, 32, 0, 0);
+            grpOpenAI.Size = new Size(486, 110);
+            grpOpenAI.TabIndex = 18;
+            grpOpenAI.Text = "OpenAI 协议";
+            grpOpenAI.TextAlignment = ContentAlignment.MiddleLeft;
+            // 
+            // lblOpenAIBaseUrl
+            // 
+            lblOpenAIBaseUrl.Font = new Font("宋体", 10F);
+            lblOpenAIBaseUrl.ForeColor = Color.FromArgb(48, 48, 48);
+            lblOpenAIBaseUrl.Location = new Point(8, 38);
+            lblOpenAIBaseUrl.Name = "lblOpenAIBaseUrl";
+            lblOpenAIBaseUrl.Size = new Size(70, 23);
+            lblOpenAIBaseUrl.TabIndex = 0;
+            lblOpenAIBaseUrl.Text = "Base URL:";
+            // 
+            // txtOpenAIBaseUrl
+            // 
+            txtOpenAIBaseUrl.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
+            txtOpenAIBaseUrl.Location = new Point(88, 35);
+            txtOpenAIBaseUrl.Margin = new Padding(4, 5, 4, 5);
+            txtOpenAIBaseUrl.MinimumSize = new Size(1, 16);
+            txtOpenAIBaseUrl.Name = "txtOpenAIBaseUrl";
+            txtOpenAIBaseUrl.Padding = new Padding(5);
+            txtOpenAIBaseUrl.ShowText = false;
+            txtOpenAIBaseUrl.Size = new Size(380, 29);
+            txtOpenAIBaseUrl.TabIndex = 1;
+            txtOpenAIBaseUrl.TextAlignment = ContentAlignment.MiddleLeft;
+            txtOpenAIBaseUrl.Watermark = "如 https://api.openai.com/v1";
+            // 
+            // lblOpenAIApiKey
+            // 
+            lblOpenAIApiKey.Font = new Font("宋体", 10F);
+            lblOpenAIApiKey.ForeColor = Color.FromArgb(48, 48, 48);
+            lblOpenAIApiKey.Location = new Point(8, 73);
+            lblOpenAIApiKey.Name = "lblOpenAIApiKey";
+            lblOpenAIApiKey.Size = new Size(70, 23);
+            lblOpenAIApiKey.TabIndex = 2;
+            lblOpenAIApiKey.Text = "API Key:";
+            // 
+            // txtOpenAIApiKey
+            // 
+            txtOpenAIApiKey.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
+            txtOpenAIApiKey.Location = new Point(88, 70);
+            txtOpenAIApiKey.Margin = new Padding(4, 5, 4, 5);
+            txtOpenAIApiKey.MinimumSize = new Size(1, 16);
+            txtOpenAIApiKey.Name = "txtOpenAIApiKey";
+            txtOpenAIApiKey.Padding = new Padding(5);
+            txtOpenAIApiKey.ShowText = false;
+            txtOpenAIApiKey.Size = new Size(380, 29);
+            txtOpenAIApiKey.TabIndex = 3;
+            txtOpenAIApiKey.TextAlignment = ContentAlignment.MiddleLeft;
+            txtOpenAIApiKey.Watermark = "";
+            // 
+            // grpAnthropic
+            // 
+            grpAnthropic.Controls.Add(lblAnthropicBaseUrl);
+            grpAnthropic.Controls.Add(txtAnthropicBaseUrl);
+            grpAnthropic.Controls.Add(lblAnthropicApiKey);
+            grpAnthropic.Controls.Add(txtAnthropicApiKey);
+            grpAnthropic.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
+            grpAnthropic.Location = new Point(4, 447);
+            grpAnthropic.Margin = new Padding(4, 5, 4, 5);
+            grpAnthropic.MinimumSize = new Size(1, 1);
+            grpAnthropic.Name = "grpAnthropic";
+            grpAnthropic.Padding = new Padding(0, 32, 0, 0);
+            grpAnthropic.Size = new Size(486, 110);
+            grpAnthropic.TabIndex = 19;
+            grpAnthropic.Text = "Anthropic 协议";
+            grpAnthropic.TextAlignment = ContentAlignment.MiddleLeft;
+            // 
+            // lblAnthropicBaseUrl
+            // 
+            lblAnthropicBaseUrl.Font = new Font("宋体", 10F);
+            lblAnthropicBaseUrl.ForeColor = Color.FromArgb(48, 48, 48);
+            lblAnthropicBaseUrl.Location = new Point(8, 38);
+            lblAnthropicBaseUrl.Name = "lblAnthropicBaseUrl";
+            lblAnthropicBaseUrl.Size = new Size(70, 23);
+            lblAnthropicBaseUrl.TabIndex = 0;
+            lblAnthropicBaseUrl.Text = "Base URL:";
+            // 
+            // txtAnthropicBaseUrl
+            // 
+            txtAnthropicBaseUrl.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
+            txtAnthropicBaseUrl.Location = new Point(88, 35);
+            txtAnthropicBaseUrl.Margin = new Padding(4, 5, 4, 5);
+            txtAnthropicBaseUrl.MinimumSize = new Size(1, 16);
+            txtAnthropicBaseUrl.Name = "txtAnthropicBaseUrl";
+            txtAnthropicBaseUrl.Padding = new Padding(5);
+            txtAnthropicBaseUrl.ShowText = false;
+            txtAnthropicBaseUrl.Size = new Size(380, 29);
+            txtAnthropicBaseUrl.TabIndex = 1;
+            txtAnthropicBaseUrl.TextAlignment = ContentAlignment.MiddleLeft;
+            txtAnthropicBaseUrl.Watermark = "如 https://api.anthropic.com";
+            // 
+            // lblAnthropicApiKey
+            // 
+            lblAnthropicApiKey.Font = new Font("宋体", 10F);
+            lblAnthropicApiKey.ForeColor = Color.FromArgb(48, 48, 48);
+            lblAnthropicApiKey.Location = new Point(8, 73);
+            lblAnthropicApiKey.Name = "lblAnthropicApiKey";
+            lblAnthropicApiKey.Size = new Size(70, 23);
+            lblAnthropicApiKey.TabIndex = 2;
+            lblAnthropicApiKey.Text = "API Key:";
+            // 
+            // txtAnthropicApiKey
+            // 
+            txtAnthropicApiKey.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
+            txtAnthropicApiKey.Location = new Point(88, 70);
+            txtAnthropicApiKey.Margin = new Padding(4, 5, 4, 5);
+            txtAnthropicApiKey.MinimumSize = new Size(1, 16);
+            txtAnthropicApiKey.Name = "txtAnthropicApiKey";
+            txtAnthropicApiKey.Padding = new Padding(5);
+            txtAnthropicApiKey.ShowText = false;
+            txtAnthropicApiKey.Size = new Size(380, 29);
+            txtAnthropicApiKey.TabIndex = 3;
+            txtAnthropicApiKey.TextAlignment = ContentAlignment.MiddleLeft;
+            txtAnthropicApiKey.Watermark = "";
             // 
             // chkProxyEnabled
             // 
@@ -598,7 +668,7 @@ namespace FunAiGateway.Forms
             // btnOK
             // 
             btnOK.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
-            btnOK.Location = new Point(133, 685);
+            btnOK.Location = new Point(133, 805);
             btnOK.MinimumSize = new Size(1, 1);
             btnOK.Name = "btnOK";
             btnOK.Size = new Size(100, 35);
@@ -609,7 +679,7 @@ namespace FunAiGateway.Forms
             // btnCancel
             // 
             btnCancel.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
-            btnCancel.Location = new Point(253, 685);
+            btnCancel.Location = new Point(253, 805);
             btnCancel.MinimumSize = new Size(1, 1);
             btnCancel.Name = "btnCancel";
             btnCancel.Size = new Size(100, 35);
@@ -629,7 +699,7 @@ namespace FunAiGateway.Forms
             uiGroupBox1.Controls.Add(cmbProxyType);
             uiGroupBox1.Controls.Add(lblProxyType);
             uiGroupBox1.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
-            uiGroupBox1.Location = new Point(4, 457);
+            uiGroupBox1.Location = new Point(4, 565);
             uiGroupBox1.Margin = new Padding(4, 5, 4, 5);
             uiGroupBox1.MinimumSize = new Size(1, 1);
             uiGroupBox1.Name = "uiGroupBox1";
@@ -644,16 +714,12 @@ namespace FunAiGateway.Forms
             AcceptButton = btnOK;
             AutoScaleMode = AutoScaleMode.None;
             CancelButton = btnCancel;
-            ClientSize = new Size(494, 724);
+            ClientSize = new Size(494, 852);
             Controls.Add(uiGroupBox1);
+            Controls.Add(grpOpenAI);
+            Controls.Add(grpAnthropic);
             Controls.Add(lblName);
             Controls.Add(txtName);
-            Controls.Add(lblType);
-            Controls.Add(cmbType);
-            Controls.Add(lblBaseUrlLabel);
-            Controls.Add(txtBaseUrl);
-            Controls.Add(lblApiKey);
-            Controls.Add(txtApiKey);
             Controls.Add(lblRealModelName);
             Controls.Add(txtRealModelName);
             Controls.Add(lblContextLength);
@@ -683,6 +749,8 @@ namespace FunAiGateway.Forms
             ((System.ComponentModel.ISupportInitialize)numMaxOutputTokens).EndInit();
             ((System.ComponentModel.ISupportInitialize)numTimeout).EndInit();
             ((System.ComponentModel.ISupportInitialize)numRetryCount).EndInit();
+            grpOpenAI.ResumeLayout(false);
+            grpAnthropic.ResumeLayout(false);
             uiGroupBox1.ResumeLayout(false);
             ResumeLayout(false);
         }

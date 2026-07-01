@@ -68,3 +68,6 @@ E:\A源码存储\CSharp商业项目\AI中转\FunAiGateway\obj\Debug\net8.0-windo
 E:\A源码存储\CSharp商业项目\AI中转\FunAiGateway\obj\Debug\net8.0-windows\FunAiGateway.genruntimeconfig.cache
 E:\A源码存储\CSharp商业项目\AI中转\FunAiGateway\obj\Debug\net8.0-windows\ref\FunAiGateway.dll
 E:\A源码存储\CSharp商业项目\AI中转\FunAiGateway\obj\Debug\net8.0-windows\FunAiGateway.Forms.LogSettingsDialog.resources
+I:\A源码存储\CSharp商业项目\AI中转\FunAiGateway\obj\Debug\net8.0-windows\FunAiGateway.Forms.LogSettingsDialog.resources
+I:\A源码存储\CSharp商业项目\AI中转\FunAiGateway\obj\Debug\net8.0-windows\FunAiGateway.Forms.KeyEditDialog.resources
+I:\A源码存储\CSharp商业项目\AI中转\FunAiGateway\obj\Debug\net8.0-windows\FunAiGateway.Properties.Resources.resources

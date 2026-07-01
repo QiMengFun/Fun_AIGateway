@@ -19,7 +19,14 @@ namespace FunAiGateway.Services
                 anthropicReq["model"] = openaiReq["model"];
 
             // max_tokens
-            var maxTokens = openaiReq["max_tokens"]?.Value<int>() ?? 4096;
+            // 推理模型客户端可能用 max_completion_tokens 而非 max_tokens
+            var maxTokens = openaiReq["max_tokens"]?.Value<int>()
+                ?? openaiReq["max_completion_tokens"]?.Value<int>()
+                ?? 4096;
+            // 推理模型的推理 token 也计入限额，确保至少 32768
+            var modelName = openaiReq["model"]?.ToString() ?? "";
+            if (IsReasoningModelName(modelName) && maxTokens < 32768)
+                maxTokens = 32768;
             anthropicReq["max_tokens"] = maxTokens;
 
             // temperature
@@ -286,7 +293,7 @@ namespace FunAiGateway.Services
             {
                 if (!line.StartsWith("data: ")) return null;
                 var data = line.Substring(6).Trim();
-                if (data == "[DONE]") return "data: [DONE]\n\n";
+                if (data == "[DONE]") return "data: [DONE]\r\n\r\n";
 
                 var evt = JObject.Parse(data);
                 var eventType = evt["type"]?.ToString();
@@ -306,7 +313,7 @@ namespace FunAiGateway.Services
                                 ["delta"] = new JObject { ["role"] = "assistant", ["content"] = "" },
                                 ["finish_reason"] = null as JToken
                             } }
-                        })}\n\n";
+                        })}\r\n\r\n";
 
                     case "content_block_start":
                         var block = evt["content_block"] as JObject;
@@ -337,7 +344,7 @@ namespace FunAiGateway.Services
                                     },
                                     ["finish_reason"] = null as JToken
                                 } }
-                            })}\n\n";
+                            })}\r\n\r\n";
                         }
                         return null; // text block start不需要特殊处理
 
@@ -357,7 +364,7 @@ namespace FunAiGateway.Services
                                     ["delta"] = new JObject { ["content"] = delta["text"]?.ToString() ?? "" },
                                     ["finish_reason"] = null as JToken
                                 } }
-                            })}\n\n";
+                            })}\r\n\r\n";
                         }
                         if (delta?["type"]?.ToString() == "input_json_delta")
                         {
@@ -380,7 +387,7 @@ namespace FunAiGateway.Services
                                     },
                                     ["finish_reason"] = null as JToken
                                 } }
-                            })}\n\n";
+                            })}\r\n\r\n";
                         }
                         return null;
 
@@ -405,10 +412,10 @@ namespace FunAiGateway.Services
                                 ["delta"] = new JObject(),
                                 ["finish_reason"] = finishReason
                             } }
-                        })}\n\n";
+                        })}\r\n\r\n";
 
                     case "message_stop":
-                        return "data: [DONE]\n\n";
+                        return "data: [DONE]\r\n\r\n";
 
                     default:
                         return null;
@@ -420,35 +427,197 @@ namespace FunAiGateway.Services
             }
         }
 
-        // OpenAI流式事件转Anthropic流式格式
-        public static string? ConvertOpenAIStreamToAnthropic(string line, string model, string? systemPrompt)
+        // 判断是否为推理模型（reasoning model）
+        private static bool IsReasoningModelName(string modelName)
         {
-            // 这个方向比较少用，但提供基本支持
+            if (string.IsNullOrEmpty(modelName)) return false;
+            var name = modelName.ToLowerInvariant();
+            // OpenAI 推理模型系列：gpt-5.x / gpt5.x、o1、o3、o4
+            return name.Contains("gpt-5")
+                || name.Contains("gpt5")
+                || name.Contains("o1")
+                || name.Contains("o3")
+                || name.Contains("o4")
+                || name.Contains("reasoning");
+        }
+    }
+
+    /// <summary>
+    /// OpenAI 流式响应 → Anthropic 流式的有状态转换器
+    /// 完整支持文本内容、tool_calls、finish_reason 映射与 usage 统计
+    /// 每个 SSE 流对应一个实例，维护 block 顺序与开关状态
+    /// </summary>
+    public class OpenAIToAnthropicStreamConverter
+    {
+        private int _nextBlockIndex = 0;
+        private int _textBlockIndex = -1;   // -1 表示文本 block 尚未创建
+        private bool _textBlockOpen = false;
+        // OpenAI 的 tool_calls[].index → Anthropic 的 content block index 映射
+        private readonly Dictionary<int, int> _toolIdxToBlockIdx = new();
+        private readonly HashSet<int> _openToolBlocks = new();
+        private bool _finished = false;       // 是否已输出 message_delta（finish_reason）
+        private int _inputTokens = 0;
+        private int _outputTokens = 0;
+
+        // 处理一行 OpenAI SSE，返回需要写给客户端的 Anthropic SSE 文本（可能为 null）
+        public string? ConvertLine(string line)
+        {
+            if (string.IsNullOrWhiteSpace(line)) return null;
+            if (!line.StartsWith("data: ")) return null;
+            var data = line.Substring(6).Trim();
+            if (data == "[DONE]") return null; // message_stop 由调用方处理
+
             try
             {
-                if (!line.StartsWith("data: ")) return null;
-                var data = line.Substring(6).Trim();
-                if (data == "[DONE]") return "event: message_stop\ndata: {}\n\n";
-
                 var chunk = JObject.Parse(data);
-                var delta = chunk["choices"]?[0]?["delta"] as JObject;
-                if (delta == null) return null;
 
-                // 简化处理：只转换文本内容
-                var content = delta["content"]?.ToString();
-                if (content != null)
+                // usage 可能与 finish_reason 同块出现，也可能单独出现
+                if (chunk["usage"] is JObject usageObj)
                 {
-                    return $"event: content_block_delta\ndata: {JsonConvert.SerializeObject(new JObject
-                    {
-                        ["type"] = "content_block_delta",
-                        ["index"] = 0,
-                        ["delta"] = new JObject { ["type"] = "text_delta", ["text"] = content }
-                    })}\n\n";
+                    _inputTokens = usageObj["prompt_tokens"]?.Value<int>() ?? 0;
+                    _outputTokens = usageObj["completion_tokens"]?.Value<int>() ?? 0;
                 }
 
+                var sb = new System.Text.StringBuilder();
+                var choice = chunk["choices"]?[0] as JObject;
+                if (choice == null)
+                {
+                    // 无 choice（如纯 usage chunk），无需写内容事件
+                    return sb.Length > 0 ? sb.ToString() : null;
+                }
+
+                var delta = choice["delta"] as JObject;
+                var finishReason = choice["finish_reason"]?.ToString();
+
+                // 1) 文本内容 delta（OpenAI 通常先发文本，再发 tool_calls）
+                if (delta?["content"] != null && delta["content"].Type != JTokenType.Null)
+                {
+                    var text = delta["content"].ToString();
+                    if (!string.IsNullOrEmpty(text))
+                    {
+                        // 文本 block 尚未创建，懒创建
+                        if (!_textBlockOpen && _textBlockIndex < 0)
+                        {
+                            _textBlockIndex = _nextBlockIndex++;
+                            _textBlockOpen = true;
+                            sb.Append(EmitContentBlockStartText(_textBlockIndex));
+                        }
+                        if (_textBlockOpen)
+                            sb.Append(EmitContentBlockDeltaText(_textBlockIndex, text));
+                    }
+                }
+
+                // 2) tool_calls delta
+                if (delta?["tool_calls"] is JArray toolCalls)
+                {
+                    // 关闭可能已打开的文本 block（Anthropic 不允许同 block 内混合 text 与 tool_use）
+                    if (_textBlockOpen)
+                    {
+                        sb.Append(EmitContentBlockStop(_textBlockIndex));
+                        _textBlockOpen = false;
+                    }
+
+                    foreach (var tc in toolCalls)
+                    {
+                        var oaiIdx = tc["index"]?.Value<int>() ?? 0;
+                        var args = tc["function"]?["arguments"]?.ToString();
+
+                        if (!_toolIdxToBlockIdx.ContainsKey(oaiIdx))
+                        {
+                            // 新的 tool block
+                            var blockIdx = _nextBlockIndex++;
+                            _toolIdxToBlockIdx[oaiIdx] = blockIdx;
+                            _openToolBlocks.Add(blockIdx);
+                            var id = tc["id"]?.ToString() ?? $"toolu_{Guid.NewGuid():N}";
+                            var name = tc["function"]?["name"]?.ToString() ?? "";
+                            sb.Append(EmitContentBlockStartToolUse(blockIdx, id, name));
+                            if (!string.IsNullOrEmpty(args))
+                                sb.Append(EmitContentBlockDeltaInputJson(blockIdx, args));
+                        }
+                        else
+                        {
+                            // 已存在的 tool block：仅追加 arguments 增量
+                            var blockIdx = _toolIdxToBlockIdx[oaiIdx];
+                            if (!string.IsNullOrEmpty(args))
+                                sb.Append(EmitContentBlockDeltaInputJson(blockIdx, args));
+                        }
+                    }
+                }
+
+                // 3) finish_reason：关闭所有打开的 block，输出 message_delta
+                if (!string.IsNullOrEmpty(finishReason))
+                {
+                    sb.Append(CloseAllBlocks());
+                    sb.Append(EmitMessageDelta(MapStopReason(finishReason), _outputTokens));
+                    _finished = true;
+                }
+
+                return sb.Length > 0 ? sb.ToString() : null;
+            }
+            catch
+            {
                 return null;
             }
-            catch { return null; }
         }
+
+        // 流结束时若未收到 finish_reason，补足 block_stop 与 message_delta
+        public string? EmitTail()
+        {
+            if (_finished) return null;
+            var sb = new System.Text.StringBuilder();
+            sb.Append(CloseAllBlocks());
+            sb.Append(EmitMessageDelta("end_turn", _outputTokens));
+            _finished = true;
+            return sb.ToString();
+        }
+
+        // 关闭所有打开的 block，返回需要写出的内容
+        private string CloseAllBlocks()
+        {
+            var sb = new System.Text.StringBuilder();
+            if (_textBlockOpen)
+            {
+                sb.Append(EmitContentBlockStop(_textBlockIndex));
+                _textBlockOpen = false;
+            }
+            if (_openToolBlocks.Count > 0)
+            {
+                foreach (var blockIdx in _openToolBlocks)
+                    sb.Append(EmitContentBlockStop(blockIdx));
+                _openToolBlocks.Clear();
+            }
+            return sb.ToString();
+        }
+
+        public bool Finished => _finished;
+        public int InputTokens => _inputTokens;
+        public int OutputTokens => _outputTokens;
+
+        // finish_reason → stop_reason 映射
+        private static string MapStopReason(string finishReason) => finishReason switch
+        {
+            "stop" => "end_turn",
+            "length" => "max_tokens",
+            "tool_calls" => "tool_use",
+            _ => "end_turn"
+        };
+
+        private static string EmitContentBlockStartText(int idx) =>
+            $"event: content_block_start\ndata: {JsonConvert.SerializeObject(new JObject { ["type"] = "content_block_start", ["index"] = idx, ["content_block"] = new JObject { ["type"] = "text", ["text"] = "" } })}\r\n\r\n";
+
+        private static string EmitContentBlockStartToolUse(int idx, string id, string name) =>
+            $"event: content_block_start\ndata: {JsonConvert.SerializeObject(new JObject { ["type"] = "content_block_start", ["index"] = idx, ["content_block"] = new JObject { ["type"] = "tool_use", ["id"] = id, ["name"] = name, ["input"] = new JObject() } })}\r\n\r\n";
+
+        private static string EmitContentBlockDeltaText(int idx, string text) =>
+            $"event: content_block_delta\ndata: {JsonConvert.SerializeObject(new JObject { ["type"] = "content_block_delta", ["index"] = idx, ["delta"] = new JObject { ["type"] = "text_delta", ["text"] = text } })}\r\n\r\n";
+
+        private static string EmitContentBlockDeltaInputJson(int idx, string partial) =>
+            $"event: content_block_delta\ndata: {JsonConvert.SerializeObject(new JObject { ["type"] = "content_block_delta", ["index"] = idx, ["delta"] = new JObject { ["type"] = "input_json_delta", ["partial_json"] = partial } })}\r\n\r\n";
+
+        private static string EmitContentBlockStop(int idx) =>
+            $"event: content_block_stop\ndata: {JsonConvert.SerializeObject(new JObject { ["type"] = "content_block_stop", ["index"] = idx })}\r\n\r\n";
+
+        private static string EmitMessageDelta(string stopReason, int outputTokens) =>
+            $"event: message_delta\ndata: {JsonConvert.SerializeObject(new JObject { ["type"] = "message_delta", ["delta"] = new JObject { ["stop_reason"] = stopReason }, ["usage"] = new JObject { ["output_tokens"] = outputTokens } })}\r\n\r\n";
     }
 }

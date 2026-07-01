@@ -7,21 +7,13 @@ namespace FunAiGateway.Services
     {
         private static readonly string ConfigDir = AppDomain.CurrentDomain.BaseDirectory;
         private static readonly string ConfigFile = Path.Combine(ConfigDir, "config.json");
-        // 日志目录：exe目录下的 logs 文件夹
-        private static readonly string LogDir = Path.Combine(ConfigDir, "logs");
-        // 请求日志目录：exe目录下的 logs/requests 文件夹
-        private static readonly string RequestLogDir = Path.Combine(LogDir, "requests");
-        // 响应内容日志目录：exe目录下的 logs/responses 文件夹
-        private static readonly string ResponseLogDir = Path.Combine(LogDir, "responses");
-        // 单个日志文件最大大小（50MB），超过则分割
-        private const long MaxLogSizeBytes = 50 * 1024 * 1024;
 
         private AppConfig _config = new();
         private readonly object _lock = new();
-        // 日志文件操作专用锁，避免并发写入冲突
-        private readonly object _logLock = new();
-        // 日志条数内存计数，避免每次写日志都扫描文件
-        private int _logLineCount = -1; // -1 表示尚未初始化
+
+        // 日志服务实例：负责文件日志的写入、读取、裁剪、清理等工作
+        // 在构造函数末尾创建，持有对 ConfigService 的引用以读取日志相关配置
+        public LogService LogService { get; }
 
         public AppConfig Config => _config;
 
@@ -30,6 +22,9 @@ namespace FunAiGateway.Services
         public ConfigService()
         {
             Load();
+            MigrateLegacyConfig();
+            // 在配置加载完成后创建日志服务，避免循环依赖
+            LogService = new LogService(this);
         }
 
         public void Load()
@@ -48,6 +43,41 @@ namespace FunAiGateway.Services
                 {
                     _config = new AppConfig();
                 }
+            }
+        }
+
+        // 迁移旧配置：将旧的单 BaseUrl/ApiKey 按 Type 迁移到对应协议端点
+        private void MigrateLegacyConfig()
+        {
+            lock (_lock)
+            {
+                bool changed = false;
+                foreach (var channel in _config.Channels)
+                {
+                    // 旧配置有 BaseUrl 但新字段为空，迁移
+                    if (!string.IsNullOrEmpty(channel.BaseUrl))
+                    {
+                        if (channel.Type == ChannelType.Anthropic)
+                        {
+                            if (string.IsNullOrEmpty(channel.AnthropicBaseUrl))
+                            {
+                                channel.AnthropicBaseUrl = channel.BaseUrl;
+                                channel.AnthropicApiKey = channel.ApiKey;
+                                changed = true;
+                            }
+                        }
+                        else
+                        {
+                            if (string.IsNullOrEmpty(channel.OpenAIBaseUrl))
+                            {
+                                channel.OpenAIBaseUrl = channel.BaseUrl;
+                                channel.OpenAIApiKey = channel.ApiKey;
+                                changed = true;
+                            }
+                        }
+                    }
+                }
+                if (changed) { Save(); }
             }
         }
 
@@ -121,6 +151,24 @@ namespace FunAiGateway.Services
             }
         }
 
+        // 查找渠道中可用的协议端点（用于自动识别请求应走哪个协议链路）
+        // 返回该渠道配置中已填写的可用协议端点（OpenAI/Anthropic 可同时存在）
+        public static ChannelProtocolEndpoints GetChannelEndpoints(ChannelConfig channel)
+        {
+            return new ChannelProtocolEndpoints
+            {
+                HasOpenAI = !string.IsNullOrWhiteSpace(channel.OpenAIBaseUrl),
+                HasAnthropic = !string.IsNullOrWhiteSpace(channel.AnthropicBaseUrl)
+            };
+        }
+
+        // 渠道可用协议端点信息
+        public class ChannelProtocolEndpoints
+        {
+            public bool HasOpenAI { get; set; }
+            public bool HasAnthropic { get; set; }
+        }
+
         // 获取所有可用模型名
         public List<string> GetAllModelNames()
         {
@@ -136,272 +184,137 @@ namespace FunAiGateway.Services
             }
         }
 
-        // 请求日志
-        // 获取当前日志文件名：按天分割，当天文件超过50M则加序号
-        private string GetCurrentLogFile()
+        // 获取所有启用的模型配置（含上下文长度、最大输出等详细信息）
+        public List<ModelConfig> GetAllModelConfigs()
         {
-            var dateStr = DateTime.Now.ToString("yyyy-MM-dd");
-            var baseFile = Path.Combine(RequestLogDir, $"requests_{dateStr}.log");
-
-            // 检查文件大小，超过50M则递增序号
-            var file = baseFile;
-            var seq = 1;
-            while (File.Exists(file) && new FileInfo(file).Length >= MaxLogSizeBytes)
+            lock (_lock)
             {
-                file = Path.Combine(RequestLogDir, $"requests_{dateStr}_{seq}.log");
-                seq++;
+                return _config.Channels
+                    .Where(c => c.Enabled)
+                    .SelectMany(c => c.Models.Where(m => m.Enabled))
+                    .GroupBy(m => m.ModelName)
+                    .Select(g => g.First())
+                    .OrderBy(m => m.ModelName)
+                    .ToList();
             }
-            return file;
         }
 
-        // 获取指定日期范围内的所有日志文件（按日期排序）
-        private List<string> GetLogFiles()
-        {
-            if (!Directory.Exists(RequestLogDir)) return new();
-            return Directory.GetFiles(RequestLogDir, "requests_*.log")
-                .OrderByDescending(f => f) // 文件名含日期，按名称倒序=最新的在前
-                .ToList();
-        }
+        // ========= API Key 管理 =========
 
-        public void AddLog(RequestLog log)
+        // 添加 API Key
+        public void AddApiKey(ApiKeyConfig apiKey)
         {
-            lock (_logLock)
+            lock (_lock)
             {
-                try
+                _config.ApiKeys.Add(apiKey);
+                Save();
+            }
+        }
+
+        // 更新 API Key
+        public void UpdateApiKey(ApiKeyConfig apiKey)
+        {
+            lock (_lock)
+            {
+                var idx = _config.ApiKeys.FindIndex(k => k.Id == apiKey.Id);
+                if (idx >= 0)
                 {
-                    Directory.CreateDirectory(RequestLogDir);
-                    var line = JsonConvert.SerializeObject(log, Formatting.None);
-                    var file = GetCurrentLogFile();
-                    File.AppendAllText(file, line + Environment.NewLine);
-
-                    // 按保留天数清理过期的请求日志文件
-                    CleanExpiredRequestLogs();
-
-                    // 超过上限则自动裁剪最早的记录
-                    var maxCount = _config.MaxLogCount;
-                    if (maxCount > 0)
-                    {
-                        // 懒初始化行数计数
-                        if (_logLineCount < 0)
-                            _logLineCount = CountAllLogLines();
-                        else
-                            _logLineCount++;
-
-                        if (_logLineCount > maxCount)
-                        {
-                            TrimLogs(maxCount);
-                            _logLineCount = CountAllLogLines();
-                        }
-                    }
+                    _config.ApiKeys[idx] = apiKey;
+                    Save();
                 }
-                catch { }
             }
         }
 
-        // 统计所有日志文件的总行数
-        private int CountAllLogLines()
+        // 删除 API Key
+        public void DeleteApiKey(string keyId)
         {
-            try
+            lock (_lock)
             {
-                var files = GetLogFiles();
-                int count = 0;
-                foreach (var file in files)
-                {
-                    count += File.ReadAllLines(file).Count(l => !string.IsNullOrWhiteSpace(l));
-                }
-                return count;
+                _config.ApiKeys.RemoveAll(k => k.Id == keyId);
+                Save();
             }
-            catch { return 0; }
         }
+
+        // 根据 Key 值查找启用的 ApiKeyConfig（用于请求鉴权）
+        public ApiKeyConfig? FindApiKey(string keyValue)
+        {
+            if (string.IsNullOrEmpty(keyValue)) return null;
+            lock (_lock)
+            {
+                return _config.ApiKeys.FirstOrDefault(k => k.Enabled && k.Key == keyValue);
+            }
+        }
+
+        // 判断指定 Key 是否允许访问指定模型
+        public bool IsKeyAllowedModel(ApiKeyConfig apiKey, string modelName)
+        {
+            if (apiKey == null) return false;
+            // 空列表表示允许访问全部模型
+            if (apiKey.AllowedModels == null || apiKey.AllowedModels.Count == 0) return true;
+            return apiKey.AllowedModels.Contains(modelName, StringComparer.OrdinalIgnoreCase);
+        }
+
+        // 判断指定 Key 是否已过期（ExpiresAt=null 表示永不过期）
+        // 返回 true 表示已过期，false 表示未过期或无限制
+        public bool IsKeyExpired(ApiKeyConfig apiKey)
+        {
+            if (apiKey == null) return true;
+            if (!apiKey.ExpiresAt.HasValue) return false;
+            return DateTime.Now > apiKey.ExpiresAt.Value;
+        }
+
+        // 扣减 Key 的剩余调用次数（RemainingCalls=0 表示不限，不扣减）
+        // 返回 true 表示允许调用，false 表示次数已耗尽
+        // 仅检查不扣减，实际扣减在请求成功后由 DecrementKeyCalls 执行
+        public bool HasRemainingCalls(string keyId)
+        {
+            lock (_lock)
+            {
+                var k = _config.ApiKeys.FirstOrDefault(x => x.Id == keyId);
+                if (k == null) return false;
+                // 0 表示不限制
+                if (k.RemainingCalls == 0) return true;
+                return k.RemainingCalls > 0;
+            }
+        }
+
+        // 实际扣减 Key 的剩余调用次数（请求成功后调用）
+        public bool DecrementKeyCalls(string keyId)
+        {
+            lock (_lock)
+            {
+                var k = _config.ApiKeys.FirstOrDefault(x => x.Id == keyId);
+                if (k == null) return false;
+                // 0 表示不限制，不扣减
+                if (k.RemainingCalls == 0) return true;
+                if (k.RemainingCalls <= 0) return false;
+                k.RemainingCalls--;
+                Save();
+                return true;
+            }
+        }
+
+        // ===================== 以下为日志相关委托方法 =====================
+        // 实际逻辑已迁移至 LogService（见 Services/LogService.cs）
+        // 这里保留与原签名一致的委托方法，保证调用方（如 MainForm、ProxyServer）无需大幅改动
+
+        // 添加请求日志到文件
+        public void AddLog(RequestLog log) => LogService.AddLog(log);
 
         // 裁剪日志到指定条数（删除最早的记录）
-        public void TrimLogs(int maxCount)
-        {
-            if (maxCount <= 0) return;
+        public void TrimLogs(int maxCount) => LogService.TrimLogs(maxCount);
 
-            lock (_logLock)
-            {
-                try
-                {
-                    var files = GetLogFiles(); // 按名称倒序（最新的在前）
-                    if (files.Count == 0) return;
+        // 获取最近的若干条请求日志（按时间正序，旧的在前）
+        public List<RequestLog> GetRecentLogs(int count = 100) => LogService.GetRecentLogs(count);
 
-                    // 读取所有文件的非空行并统计
-                    int totalCount = 0;
-                    var fileLines = new Dictionary<string, List<string>>();
-                    foreach (var file in files)
-                    {
-                        var lines = File.ReadAllLines(file)
-                            .Where(l => !string.IsNullOrWhiteSpace(l))
-                            .ToList();
-                        fileLines[file] = lines;
-                        totalCount += lines.Count;
-                    }
+        // 清空所有请求日志文件
+        public void ClearLogs() => LogService.ClearLogs();
 
-                    if (totalCount <= maxCount) return;
-
-                    // 需要移除的条数
-                    int toRemove = totalCount - maxCount;
-
-                    // 从最旧的文件开始移除（files 是最新的在前，所以从末尾遍历）
-                    for (int i = files.Count - 1; i >= 0 && toRemove > 0; i--)
-                    {
-                        var file = files[i];
-                        var lines = fileLines[file];
-
-                        if (toRemove >= lines.Count)
-                        {
-                            // 整个文件都可删除
-                            File.Delete(file);
-                            toRemove -= lines.Count;
-                        }
-                        else
-                        {
-                            // 保留该文件中最新的 (lines.Count - toRemove) 行
-                            var keepLines = lines.Skip(toRemove).ToList();
-                            File.WriteAllLines(file, keepLines);
-                            toRemove = 0;
-                        }
-                    }
-
-                    // 更新内存计数
-                    _logLineCount = maxCount;
-                }
-                catch { }
-            }
-        }
-
-        public List<RequestLog> GetRecentLogs(int count = 100)
-        {
-            try
-            {
-                var files = GetLogFiles();
-                if (files.Count == 0) return new();
-
-                var result = new List<RequestLog>();
-                foreach (var file in files)
-                {
-                    if (result.Count >= count) break;
-                    var lines = File.ReadAllLines(file)
-                        .Where(l => !string.IsNullOrWhiteSpace(l));
-                    foreach (var line in lines.Reverse())
-                    {
-                        var log = JsonConvert.DeserializeObject<RequestLog>(line);
-                        if (log != null)
-                            result.Add(log);
-                        if (result.Count >= count) break;
-                    }
-                }
-                // 结果需要按时间正序（旧的在前）
-                result.Reverse();
-                return result;
-            }
-            catch { return new(); }
-        }
-
-        public void ClearLogs()
-        {
-            lock (_logLock)
-            {
-                try
-                {
-                    if (!Directory.Exists(RequestLogDir)) return;
-                    foreach (var file in GetLogFiles())
-                        File.Delete(file);
-                    _logLineCount = 0;
-                }
-                catch { }
-            }
-        }
-
-        // 响应内容日志
         // 将上游响应内容写入文件，用于排查限流、错误等问题
-        // 文件名格式：responses_2026-06-18_143025_渠道名_状态码.json
-        // 自动清理超过 LogRetentionDays 天的响应日志文件
         public void WriteResponseLog(string channelName, int statusCode, string modelName, string responseBody)
-        {
-            try
-            {
-                Directory.CreateDirectory(ResponseLogDir);
+            => LogService.WriteResponseLog(channelName, statusCode, modelName, responseBody);
 
-                // 文件名中的渠道名去掉不合法字符
-                var safeName = string.Join("_", channelName.Split(Path.GetInvalidFileNameChars()));
-                var timestamp = DateTime.Now.ToString("yyyy-MM-dd_HHmmss");
-                var fileName = $"responses_{timestamp}_{safeName}_{statusCode}.json";
-                var filePath = Path.Combine(ResponseLogDir, fileName);
-
-                var entry = new
-                {
-                    time = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
-                    channel = channelName,
-                    model = modelName,
-                    statusCode,
-                    response = responseBody
-                };
-
-                var json = JsonConvert.SerializeObject(entry, Formatting.Indented);
-                File.WriteAllText(filePath, json);
-
-                // 自动清理过期响应日志
-                CleanExpiredResponseLogs();
-            }
-            catch { }
-        }
-
-        // 清理超过保留天数的响应日志文件
-        private void CleanExpiredResponseLogs()
-        {
-            try
-            {
-                if (!Directory.Exists(ResponseLogDir)) { return; }
-                var retentionDays = _config.LogRetentionDays;
-                if (retentionDays <= 0) { return; }
-                var cutoff = DateTime.Now.AddDays(-retentionDays);
-
-                foreach (var file in Directory.GetFiles(ResponseLogDir, "responses_*.json"))
-                {
-                    if (File.GetCreationTime(file) < cutoff)
-                    {
-                        try { File.Delete(file); } catch { }
-                    }
-                }
-            }
-            catch { }
-        }
-
-        // 清理超过保留天数的请求日志文件
-        private void CleanExpiredRequestLogs()
-        {
-            try
-            {
-                if (!Directory.Exists(RequestLogDir)) { return; }
-                var retentionDays = _config.LogRetentionDays;
-                if (retentionDays <= 0) { return; }
-                var cutoff = DateTime.Now.AddDays(-retentionDays);
-
-                foreach (var file in Directory.GetFiles(RequestLogDir, "requests_*.log"))
-                {
-                    if (File.GetCreationTime(file) < cutoff)
-                    {
-                        try { File.Delete(file); } catch { }
-                    }
-                }
-            }
-            catch { }
-        }
-
-        // 清空所有响应日志
-        public void ClearResponseLogs()
-        {
-            try
-            {
-                if (!Directory.Exists(ResponseLogDir)) { return; }
-                foreach (var file in Directory.GetFiles(ResponseLogDir, "responses_*.json"))
-                {
-                    try { File.Delete(file); } catch { }
-                }
-            }
-            catch { }
-        }
+        // 清空所有响应日志文件
+        public void ClearResponseLogs() => LogService.ClearResponseLogs();
     }
 }

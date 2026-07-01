@@ -21,13 +21,6 @@ namespace FunAiGateway
             _configService = new ConfigService();
             _proxyServer = new ProxyServer(_configService);
 
-            // 首次启动自动生成API Key
-            if (string.IsNullOrWhiteSpace(_configService.Config.ApiKey))
-            {
-                _configService.Config.ApiKey = "fk-" + Guid.NewGuid().ToString("N");
-                _configService.Save();
-            }
-
             // 事件绑定
             btnAddChannel.Click += BtnAddChannel_Click;
             btnEditChannel.Click += BtnEditChannel_Click;
@@ -37,6 +30,13 @@ namespace FunAiGateway
             btnStop.Click += BtnStop_Click;
             btnSaveSettings.Click += BtnSaveSettings_Click;
             btnClearLogs.Click += BtnClearLogs_Click;
+
+            // 密钥管理按钮事件
+            btnAddKey.Click += BtnAddKey_Click;
+            btnDeleteKey.Click += BtnDeleteKey_Click;
+            btnEditKeyModels.Click += BtnEditKeyModels_Click;
+            // 双击密钥行进入编辑
+            dgvKeys.CellDoubleClick += (_, e) => { if (e.RowIndex >= 0) BtnEditKeyModels_Click(null, EventArgs.Empty); };
 
             // 日志上限变化时保存并裁剪已有日志
             dgvChannels.DoubleClick += BtnEditChannel_Click;
@@ -62,14 +62,8 @@ namespace FunAiGateway
             rdoLocal.ValueChanged += (_, _) => { AutoSaveSettings(); UpdateConnectionInfo(); };
             rdoBroadcast.ValueChanged += (_, _) => { AutoSaveSettings(); UpdateConnectionInfo(); };
 
-            // API Key验证切换时自动保存
-            chkRequireApiKey.ValueChanged += (_, _) => AutoSaveSettings();
-
             // 自动启动切换时自动保存
             chkAutoStart.ValueChanged += (_, _) => AutoSaveSettings();
-
-            // API Key显示/隐藏切换
-            btnToggleKeyVisibility.Click += BtnToggleKeyVisibility_Click;
 
             // 自定义域名变化时保存并更新连接信息
             txtCustomHost.TextChanged += (_, _) => { AutoSaveSettings(); UpdateConnectionInfo(); };
@@ -83,6 +77,7 @@ namespace FunAiGateway
             // 加载设置
             LoadSettings();
             RefreshChannels();
+            RefreshKeys();
             UpdateConnectionInfo();
             _initialized = true;
 
@@ -94,12 +89,6 @@ namespace FunAiGateway
         }
 
         private ListenMode GetCurrentListenMode() => rdoBroadcast.Checked ? ListenMode.Broadcast : ListenMode.Local;
-
-        private void BtnToggleKeyVisibility_Click(object? sender, EventArgs e)
-        {
-            txtApiKey.UseSystemPasswordChar = !txtApiKey.UseSystemPasswordChar;
-            btnToggleKeyVisibility.Text = txtApiKey.UseSystemPasswordChar ? "显示" : "隐藏";
-        }
 
         private string GetDisplayHost()
         {
@@ -156,8 +145,6 @@ namespace FunAiGateway
             rdoLocal.Checked = _configService.Config.ListenMode == ListenMode.Local;
             rdoBroadcast.Checked = _configService.Config.ListenMode == ListenMode.Broadcast;
             txtCustomHost.Text = _configService.Config.CustomHost;
-            chkRequireApiKey.Checked = _configService.Config.RequireApiKey;
-            txtApiKey.Text = _configService.Config.ApiKey;
             chkAutoStart.Checked = _configService.Config.AutoStartOnLaunch;
             RefreshDefaultModelCombo();
         }
@@ -186,8 +173,6 @@ namespace FunAiGateway
             _configService.Config.ListenMode = GetCurrentListenMode();
             _configService.Config.CustomHost = txtCustomHost.Text.Trim();
             _configService.Config.DefaultModel = cmbDefaultModel.SelectedItem?.ToString() ?? "";
-            _configService.Config.RequireApiKey = chkRequireApiKey.Checked;
-            _configService.Config.ApiKey = txtApiKey.Text.Trim();
             _configService.Config.AutoStartOnLaunch = chkAutoStart.Checked;
             _configService.Save();
         }
@@ -247,8 +232,7 @@ namespace FunAiGateway
                 c.Id,
                 模型名称 = c.Name,
                 实际模型 = c.Models.FirstOrDefault()?.RealModelName ?? c.Name,
-                协议 = c.Type.ToString(),
-                BaseUrl = c.BaseUrl,
+                协议 = BuildProtocolDisplay(c),
                 上下文 = c.Models.FirstOrDefault()?.ContextLength ?? 0,
                 状态 = c.Enabled ? "启用" : "禁用"
             }).ToList();
@@ -258,6 +242,93 @@ namespace FunAiGateway
                 dgvChannels.Columns["Id"]!.Visible = false;
 
             RefreshDefaultModelCombo();
+        }
+
+        // 构建渠道协议展示文本（支持双协议）
+        private static string BuildProtocolDisplay(ChannelConfig c)
+        {
+            var hasOpenAI = !string.IsNullOrWhiteSpace(c.OpenAIBaseUrl);
+            var hasAnthropic = !string.IsNullOrWhiteSpace(c.AnthropicBaseUrl);
+            if (hasOpenAI && hasAnthropic) return "OpenAI+Anthropic";
+            if (hasOpenAI) return "OpenAI";
+            if (hasAnthropic) return "Anthropic";
+            // 兼容旧配置
+            return c.Type.ToString();
+        }
+
+        // 刷新密钥列表
+        private void RefreshKeys()
+        {
+            var keys = _configService.Config.ApiKeys.Select(k => new
+            {
+                k.Id,
+                名称 = k.Name,
+                密钥 = k.Key,
+                允许模型 = k.AllowedModels == null || k.AllowedModels.Count == 0 ? "全部" : string.Join(", ", k.AllowedModels),
+                剩余次数 = k.RemainingCalls == 0 ? "不限" : k.RemainingCalls.ToString(),
+                到期时间 = k.ExpiresAt.HasValue ? k.ExpiresAt.Value.ToString("yyyy-MM-dd HH:mm") : "永不过期",
+                状态 = k.Enabled ? "启用" : "禁用",
+                创建时间 = k.CreatedAt.ToString("yyyy-MM-dd HH:mm")
+            }).ToList();
+
+            dgvKeys.DataSource = keys;
+            if (dgvKeys.Columns["Id"] != null)
+                dgvKeys.Columns["Id"]!.Visible = false;
+            dgvKeys.ClearSelection();
+        }
+
+        // 添加密钥
+        private void BtnAddKey_Click(object? sender, EventArgs e)
+        {
+            // 生成新Key，默认名称为空，允许访问全部模型
+            var newKey = new ApiKeyConfig
+            {
+                Key = "fk-" + Guid.NewGuid().ToString("N"),
+                Name = "Key-" + DateTime.Now.ToString("HHmmss"),
+                Enabled = true,
+                AllowedModels = new()
+            };
+            using var dlg = new KeyEditDialog(newKey, _configService.GetAllModelNames());
+            if (dlg.ShowDialog(this) == DialogResult.OK)
+            {
+                _configService.AddApiKey(dlg.ApiKey);
+                RefreshKeys();
+                this.ShowInfoTip("密钥已添加");
+            }
+        }
+
+        // 删除密钥
+        private void BtnDeleteKey_Click(object? sender, EventArgs e)
+        {
+            if (dgvKeys.SelectedRows.Count == 0) return;
+            var id = dgvKeys.SelectedRows[0].Cells["Id"].Value?.ToString();
+            if (id == null) return;
+
+            if (this.ShowAskDialog("确认删除", "确定删除该密钥？"))
+            {
+                _configService.DeleteApiKey(id);
+                RefreshKeys();
+                this.ShowInfoTip("密钥已删除");
+            }
+        }
+
+        // 编辑密钥的模型权限
+        private void BtnEditKeyModels_Click(object? sender, EventArgs e)
+        {
+            if (dgvKeys.SelectedRows.Count == 0) return;
+            var id = dgvKeys.SelectedRows[0].Cells["Id"].Value?.ToString();
+            if (id == null) return;
+
+            var apiKey = _configService.Config.ApiKeys.FirstOrDefault(k => k.Id == id);
+            if (apiKey == null) return;
+
+            using var dlg = new KeyEditDialog(apiKey, _configService.GetAllModelNames());
+            if (dlg.ShowDialog(this) == DialogResult.OK)
+            {
+                _configService.UpdateApiKey(dlg.ApiKey);
+                RefreshKeys();
+                this.ShowInfoTip("密钥已更新");
+            }
         }
 
         private void RefreshDefaultModelCombo()

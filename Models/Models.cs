@@ -1,20 +1,10 @@
 namespace FunAiGateway.Models
 {
-    // 渠道协议类型
-    public enum ChannelType
-    {
-        OpenAI,      // OpenAI兼容协议
-        Anthropic    // Anthropic协议
-    }
-
     // 渠道配置
     public class ChannelConfig
     {
         public string Id { get; set; } = Guid.NewGuid().ToString();
         public string Name { get; set; } = "";
-        public ChannelType Type { get; set; } = ChannelType.OpenAI;
-        public string BaseUrl { get; set; } = "";
-        public string ApiKey { get; set; } = "";
         public bool Enabled { get; set; } = true;
         public List<ModelConfig> Models { get; set; } = new();
         public string CustomHeaders { get; set; } = ""; // 自定义请求头 JSON格式
@@ -26,6 +16,40 @@ namespace FunAiGateway.Models
         public string ProxyHost { get; set; } = "";            // 代理IP:端口 如 127.0.0.1:7890
         public string ProxyUsername { get; set; } = "";        // 代理用户名（可选）
         public string ProxyPassword { get; set; } = "";        // 代理密码（可选）
+
+        // OpenAI 协议端点（可单独配置，留空表示该渠道不提供 OpenAI 协议接入）
+        public string OpenAIBaseUrl { get; set; } = "";
+        public string OpenAIApiKey { get; set; } = "";
+
+        // Anthropic 协议端点（可单独配置，留空表示该渠道不提供 Anthropic 协议接入）
+        public string AnthropicBaseUrl { get; set; } = "";
+        public string AnthropicApiKey { get; set; } = "";
+
+        // 兼容旧配置：Type 字段保留用于反序列化旧 config.json，不再用于路由
+        public ChannelType Type { get; set; } = ChannelType.OpenAI;
+        // 兼容旧配置：旧的单 BaseUrl/ApiKey，加载时迁移到 OpenAI 端点
+        public string BaseUrl { get; set; } = "";
+        public string ApiKey { get; set; } = "";
+    }
+
+    // 渠道协议类型（仅用于旧配置兼容，不再用于路由决策）
+    public enum ChannelType
+    {
+        OpenAI,      // OpenAI兼容协议
+        Anthropic    // Anthropic协议
+    }
+
+    // API Key 配置（可指定允许访问的模型列表，空列表表示允许访问全部模型）
+    public class ApiKeyConfig
+    {
+        public string Id { get; set; } = Guid.NewGuid().ToString("N");
+        public string Key { get; set; } = "";                    // API Key 值
+        public string Name { get; set; } = "";                   // 备注/名称
+        public bool Enabled { get; set; } = true;                // 是否启用
+        public List<string> AllowedModels { get; set; } = new(); // 允许访问的模型名（空表示全部）
+        public int RemainingCalls { get; set; } = 0;             // 剩余可调用次数，0 表示不限制
+        public DateTime? ExpiresAt { get; set; } = null;         // 到期时间，null 表示永不过期
+        public DateTime CreatedAt { get; set; } = DateTime.Now;
     }
 
     // 模型配置
@@ -58,6 +82,7 @@ namespace FunAiGateway.Models
         public bool Success { get; set; } = true;
         public string ErrorMessage { get; set; } = "";
         public long DurationMs { get; set; } = 0;
+        public string? KeyId { get; set; } = null;  // 鉴权通过的API Key Id，用于成功后扣减次数
     }
 
     // 监听模式
@@ -73,10 +98,9 @@ namespace FunAiGateway.Models
         public int ListenPort { get; set; } = 80;
         public ListenMode ListenMode { get; set; } = ListenMode.Local;
         public string CustomHost { get; set; } = "";         // 自定义域名/IP，留空则自动检测
-        public string ApiKey { get; set; } = "";             // 网关自身的API Key
-        public bool RequireApiKey { get; set; } = true;      // 默认需要验证API Key
         public string DefaultModel { get; set; } = "";       // system_model 默认路由到的模型名
         public List<ChannelConfig> Channels { get; set; } = new();
+        public List<ApiKeyConfig> ApiKeys { get; set; } = new(); // 多 API Key 列表（支持按Key限定模型）
         public int LogRetentionDays { get; set; } = 7;
         public int MaxLogCount { get; set; } = 500; // 日志最大保留条数，超过自动删除最早记录
         public bool AutoStartOnLaunch { get; set; } = false; // 启动软件时自动启动中转服务

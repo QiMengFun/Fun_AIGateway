@@ -184,7 +184,7 @@ namespace FunAiGateway
             tabControl.MainPage = "";
             tabControl.Name = "tabControl";
             tabControl.SelectedIndex = 0;
-            tabControl.Size = new Size(1163, 552);
+            tabControl.Size = new Size(1225, 552);
             tabControl.SizeMode = TabSizeMode.Fixed;
             tabControl.TabIndex = 0;
             tabControl.TabUnSelectedForeColor = Color.FromArgb(240, 240, 240);
@@ -201,7 +201,7 @@ namespace FunAiGateway
             tabSettings.Controls.Add(grpConnectionInfo);
             tabSettings.Location = new Point(0, 40);
             tabSettings.Name = "tabSettings";
-            tabSettings.Size = new Size(1163, 512);
+            tabSettings.Size = new Size(1225, 512);
             tabSettings.TabIndex = 0;
             tabSettings.Text = "设置";
             // 
@@ -224,7 +224,7 @@ namespace FunAiGateway
             grpNetwork.MinimumSize = new Size(1, 1);
             grpNetwork.Name = "grpNetwork";
             grpNetwork.Padding = new Padding(0, 32, 0, 0);
-            grpNetwork.Size = new Size(1155, 110);
+            grpNetwork.Size = new Size(1217, 110);
             grpNetwork.TabIndex = 0;
             grpNetwork.Text = "网络设置";
             grpNetwork.TextAlignment = ContentAlignment.MiddleLeft;
@@ -379,7 +379,7 @@ namespace FunAiGateway
             // 
             btnSaveSettings.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             btnSaveSettings.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
-            btnSaveSettings.Location = new Point(1017, 123);
+            btnSaveSettings.Location = new Point(1079, 123);
             btnSaveSettings.MinimumSize = new Size(1, 1);
             btnSaveSettings.Name = "btnSaveSettings";
             btnSaveSettings.Size = new Size(130, 40);
@@ -421,7 +421,7 @@ namespace FunAiGateway
             grpConnectionInfo.MinimumSize = new Size(1, 1);
             grpConnectionInfo.Name = "grpConnectionInfo";
             grpConnectionInfo.Padding = new Padding(0, 32, 0, 0);
-            grpConnectionInfo.Size = new Size(1155, 336);
+            grpConnectionInfo.Size = new Size(1217, 336);
             grpConnectionInfo.TabIndex = 5;
             grpConnectionInfo.Text = "连接信息";
             grpConnectionInfo.TextAlignment = ContentAlignment.MiddleLeft;
@@ -448,7 +448,7 @@ namespace FunAiGateway
             txtOpenAIUrl.Padding = new Padding(5);
             txtOpenAIUrl.ReadOnly = true;
             txtOpenAIUrl.ShowText = false;
-            txtOpenAIUrl.Size = new Size(1045, 29);
+            txtOpenAIUrl.Size = new Size(1107, 29);
             txtOpenAIUrl.TabIndex = 1;
             txtOpenAIUrl.TextAlignment = ContentAlignment.MiddleLeft;
             txtOpenAIUrl.Watermark = "";
@@ -457,7 +457,7 @@ namespace FunAiGateway
             // 
             btnCopyOpenAI.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             btnCopyOpenAI.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
-            btnCopyOpenAI.Location = new Point(1068, 45);
+            btnCopyOpenAI.Location = new Point(1130, 45);
             btnCopyOpenAI.MinimumSize = new Size(1, 1);
             btnCopyOpenAI.Name = "btnCopyOpenAI";
             btnCopyOpenAI.Size = new Size(75, 32);
@@ -487,7 +487,7 @@ namespace FunAiGateway
             txtAnthropicUrl.Padding = new Padding(5);
             txtAnthropicUrl.ReadOnly = true;
             txtAnthropicUrl.ShowText = false;
-            txtAnthropicUrl.Size = new Size(1045, 29);
+            txtAnthropicUrl.Size = new Size(1107, 29);
             txtAnthropicUrl.TabIndex = 4;
             txtAnthropicUrl.TextAlignment = ContentAlignment.MiddleLeft;
             txtAnthropicUrl.Watermark = "";
@@ -496,7 +496,7 @@ namespace FunAiGateway
             // 
             btnCopyAnthropic.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             btnCopyAnthropic.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
-            btnCopyAnthropic.Location = new Point(1068, 102);
+            btnCopyAnthropic.Location = new Point(1130, 102);
             btnCopyAnthropic.MinimumSize = new Size(1, 1);
             btnCopyAnthropic.Name = "btnCopyAnthropic";
             btnCopyAnthropic.Size = new Size(75, 32);
@@ -526,7 +526,7 @@ namespace FunAiGateway
             txtModelsUrl.Padding = new Padding(5);
             txtModelsUrl.ReadOnly = true;
             txtModelsUrl.ShowText = false;
-            txtModelsUrl.Size = new Size(1045, 29);
+            txtModelsUrl.Size = new Size(1107, 29);
             txtModelsUrl.TabIndex = 7;
             txtModelsUrl.TextAlignment = ContentAlignment.MiddleLeft;
             txtModelsUrl.Watermark = "";
@@ -535,7 +535,7 @@ namespace FunAiGateway
             // 
             btnCopyModels.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             btnCopyModels.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
-            btnCopyModels.Location = new Point(1068, 159);
+            btnCopyModels.Location = new Point(1130, 159);
             btnCopyModels.MinimumSize = new Size(1, 1);
             btnCopyModels.Name = "btnCopyModels";
             btnCopyModels.Size = new Size(75, 32);
@@ -565,7 +565,7 @@ namespace FunAiGateway
             txtPortalUrl.Padding = new Padding(5);
             txtPortalUrl.ReadOnly = true;
             txtPortalUrl.ShowText = false;
-            txtPortalUrl.Size = new Size(1045, 32);
+            txtPortalUrl.Size = new Size(1107, 32);
             txtPortalUrl.TabIndex = 10;
             txtPortalUrl.TextAlignment = ContentAlignment.MiddleLeft;
             txtPortalUrl.Watermark = "";
@@ -574,7 +574,7 @@ namespace FunAiGateway
             // 
             btnCopyPortal.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             btnCopyPortal.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
-            btnCopyPortal.Location = new Point(1068, 218);
+            btnCopyPortal.Location = new Point(1130, 218);
             btnCopyPortal.MinimumSize = new Size(1, 1);
             btnCopyPortal.Name = "btnCopyPortal";
             btnCopyPortal.Size = new Size(75, 32);
@@ -957,7 +957,7 @@ namespace FunAiGateway
             statusStrip.Items.AddRange(new ToolStripItem[] { lblStatus, lblRequestCount });
             statusStrip.Location = new Point(0, 587);
             statusStrip.Name = "statusStrip";
-            statusStrip.Size = new Size(1159, 22);
+            statusStrip.Size = new Size(1221, 22);
             statusStrip.TabIndex = 1;
             // 
             // lblStatus
@@ -973,7 +973,7 @@ namespace FunAiGateway
             // MainForm
             // 
             AutoScaleMode = AutoScaleMode.None;
-            ClientSize = new Size(1163, 609);
+            ClientSize = new Size(1225, 609);
             Controls.Add(tabControl);
             Controls.Add(statusStrip);
             Icon = (Icon)resources.GetObject("$this.Icon");

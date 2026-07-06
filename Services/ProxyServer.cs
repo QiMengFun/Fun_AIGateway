@@ -1593,7 +1593,7 @@ namespace FunAiGateway.Services
                         ["allowedModels"] = new JArray(allowedModelNames.Select(m => (JValue)m)),
                         ["models"] = new JArray(modelsJson),
                         ["remainingCalls"] = apiKey.RemainingCalls,
-                        ["remainingCallsDisplay"] = apiKey.RemainingCalls == 0 ? "无限" : apiKey.RemainingCalls.ToString(),
+                        ["remainingCallsDisplay"] = apiKey.RemainingCalls == null ? "无限" : apiKey.RemainingCalls.ToString(),
                         ["expiresAt"] = apiKey.ExpiresAt.HasValue ? apiKey.ExpiresAt.Value.ToString("yyyy-MM-dd HH:mm") : null,
                         ["expiresAtDisplay"] = apiKey.ExpiresAt.HasValue ? apiKey.ExpiresAt.Value.ToString("yyyy-MM-dd HH:mm") : "永不过期",
                         ["isExpired"] = _configService.IsKeyExpired(apiKey),
@@ -1773,7 +1773,7 @@ function queryKey(){
 // 渲染 Key 信息 + Tab 布局（Key 信息 / 调用日志）
 function renderKeyInfo(d){
   var statusTag=d.enabled?(d.isExpired?'<span class=""tag tag-red"">已过期</span>':'<span class=""tag tag-green"">正常</span>'):'<span class=""tag tag-red"">已禁用</span>';
-  var callsTag=d.remainingCalls===0?'<span class=""tag tag-green"">无限</span>':d.remainingCalls;
+  var callsTag=(d.remainingCalls===null||d.remainingCalls===undefined)?'<span class=""tag tag-green"">无限</span>':d.remainingCalls;
   var modelsHtml='';
   if(d.models&&d.models.length>0){
     modelsHtml='<table class=""model-table""><thead><tr><th>模型名称</th><th>上下文长度</th><th>最大输出</th></tr></thead><tbody>';
@@ -1826,7 +1826,7 @@ function refreshKeyInfo(){
       var body=document.getElementById('keyInfoBody');
       if(!body){return;}
       var statusTag=d.enabled?(d.isExpired?'<span class=""tag tag-red"">已过期</span>':'<span class=""tag tag-green"">正常</span>'):'<span class=""tag tag-red"">已禁用</span>';
-      var callsTag=d.remainingCalls===0?'<span class=""tag tag-green"">无限</span>':d.remainingCalls;
+      var callsTag=(d.remainingCalls===null||d.remainingCalls===undefined)?'<span class=""tag tag-green"">无限</span>':d.remainingCalls;
       var modelsHtml='';
       if(d.models&&d.models.length>0){
         modelsHtml='<table class=""model-table""><thead><tr><th>模型名称</th><th>上下文长度</th><th>最大输出</th></tr></thead><tbody>';

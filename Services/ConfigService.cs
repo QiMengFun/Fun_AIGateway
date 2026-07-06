@@ -266,7 +266,7 @@ namespace FunAiGateway.Services
             return DateTime.Now > apiKey.ExpiresAt.Value;
         }
 
-        // 扣减 Key 的剩余调用次数（RemainingCalls=0 表示不限，不扣减）
+        // 扣减 Key 的剩余调用次数（RemainingCalls=null 表示不限，不扣减）
         // 返回 true 表示允许调用，false 表示次数已耗尽
         // 仅检查不扣减，实际扣减在请求成功后由 DecrementKeyCalls 执行
         public bool HasRemainingCalls(string keyId)
@@ -275,8 +275,8 @@ namespace FunAiGateway.Services
             {
                 var k = _config.ApiKeys.FirstOrDefault(x => x.Id == keyId);
                 if (k == null) return false;
-                // 0 表示不限制
-                if (k.RemainingCalls == 0) return true;
+                // null 表示不限制（无限）；0 及负数表示已耗尽
+                if (k.RemainingCalls == null) return true;
                 return k.RemainingCalls > 0;
             }
         }
@@ -288,8 +288,8 @@ namespace FunAiGateway.Services
             {
                 var k = _config.ApiKeys.FirstOrDefault(x => x.Id == keyId);
                 if (k == null) return false;
-                // 0 表示不限制，不扣减
-                if (k.RemainingCalls == 0) return true;
+                // null 表示不限制，不扣减
+                if (k.RemainingCalls == null) return true;
                 if (k.RemainingCalls <= 0) return false;
                 k.RemainingCalls--;
                 Save();

@@ -47,7 +47,7 @@ namespace FunAiGateway.Models
         public string Name { get; set; } = "";                   // 备注/名称
         public bool Enabled { get; set; } = true;                // 是否启用
         public List<string> AllowedModels { get; set; } = new(); // 允许访问的模型名（空表示全部）
-        public int RemainingCalls { get; set; } = 0;             // 剩余可调用次数，0 表示不限制
+        public int? RemainingCalls { get; set; } = null;        // 剩余可调用次数，null 表示不限制（无限），0 表示已耗尽
         public DateTime? ExpiresAt { get; set; } = null;         // 到期时间，null 表示永不过期
         public DateTime CreatedAt { get; set; } = DateTime.Now;
     }

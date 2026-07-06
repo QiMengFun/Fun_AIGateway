@@ -49,8 +49,8 @@ namespace FunAiGateway.Forms
             txtName.Text = ApiKey.Name;
             txtKey.Text = ApiKey.Key;
             chkEnabled.Checked = ApiKey.Enabled;
-            // 剩余次数：0 表示无限调用
-            if (ApiKey.RemainingCalls == 0)
+            // 剩余次数：null 表示无限调用，0 表示已耗尽
+            if (ApiKey.RemainingCalls == null)
             {
                 chkUnlimitedCalls.Checked = true;
                 numRemaining.Value = 0;
@@ -59,7 +59,7 @@ namespace FunAiGateway.Forms
             else
             {
                 chkUnlimitedCalls.Checked = false;
-                numRemaining.Value = ApiKey.RemainingCalls;
+                numRemaining.Value = ApiKey.RemainingCalls.Value;
                 numRemaining.Enabled = true;
             }
             // 到期时间：null 表示永不过期
@@ -109,8 +109,8 @@ namespace FunAiGateway.Forms
             ApiKey.Name = name;
             ApiKey.Key = key;
             ApiKey.Enabled = chkEnabled.Checked;
-            // 无限调用勾选时 RemainingCalls=0，否则取输入值
-            ApiKey.RemainingCalls = chkUnlimitedCalls.Checked ? 0 : (int)numRemaining.Value;
+            // 无限调用勾选时 RemainingCalls=null，否则取输入值
+            ApiKey.RemainingCalls = chkUnlimitedCalls.Checked ? null : (int?)numRemaining.Value;
             ApiKey.ExpiresAt = chkNeverExpires.Checked ? null : dtpExpires.Value;
             ApiKey.AllowedModels = allowed;
 

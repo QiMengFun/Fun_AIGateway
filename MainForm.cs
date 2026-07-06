@@ -295,7 +295,7 @@ namespace FunAiGateway
                 名称 = k.Name,
                 密钥 = k.Key,
                 允许模型 = k.AllowedModels == null || k.AllowedModels.Count == 0 ? "全部" : string.Join(", ", k.AllowedModels),
-                剩余次数 = k.RemainingCalls == 0 ? "不限" : k.RemainingCalls.ToString(),
+                剩余次数 = k.RemainingCalls == null ? "不限" : k.RemainingCalls.ToString(),
                 到期时间 = k.ExpiresAt.HasValue ? k.ExpiresAt.Value.ToString("yyyy-MM-dd HH:mm") : "永不过期",
                 状态 = k.Enabled ? "启用" : "禁用",
                 创建时间 = k.CreatedAt.ToString("yyyy-MM-dd HH:mm")

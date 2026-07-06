@@ -344,7 +344,8 @@ namespace FunAiGateway.Forms
             // numRetryCount
             // 
             numRetryCount.Location = new Point(308, 179);
-            numRetryCount.Maximum = new decimal(new int[] { 10, 0, 0, 0 });
+            // 重试次数最大值：不限制上限（int.MaxValue）
+            numRetryCount.Maximum = new decimal(new int[] { int.MaxValue, 0, 0, 0 });
             numRetryCount.Name = "numRetryCount";
             numRetryCount.Size = new Size(80, 26);
             numRetryCount.TabIndex = 11;

@@ -367,6 +367,11 @@ namespace FunAiGateway.Services
                     // 用户自助查询API：POST { "key": "fk-xxx" } 返回Key信息
                     await HandlePortalKeyInfoAsync(context, body);
                 }
+                else if (path.Equals("/portal/api/keylogs", StringComparison.OrdinalIgnoreCase))
+                {
+                    // 用户自助查询API：POST { "key": "fk-xxx" } 返回该 Key 的最近调用日志
+                    await HandlePortalKeyLogsAsync(context, body);
+                }
                 else
                 {
                     response.StatusCode = 404;
@@ -1436,6 +1441,83 @@ namespace FunAiGateway.Services
             context.Response.Close();
         }
 
+        // 用户自助查询API：POST {"key":"fk-xxx"} → 返回该 Key 的最近调用日志
+        // 与 keyinfo 分离，便于前端单独刷新日志列表而不影响 Key 信息
+        private async Task HandlePortalKeyLogsAsync(HttpListenerContext context, string body)
+        {
+            try
+            {
+                // 速率限制：复用 Portal 限流（每 IP 每分钟 10 次）
+                var clientIp = context.Request.RemoteEndPoint?.Address?.ToString() ?? "unknown";
+                if (!CheckPortalRateLimit(clientIp))
+                {
+                    context.Response.StatusCode = 429;
+                    await WriteJsonAsync(context.Response, new { success = false, message = "查询过于频繁，请稍后再试" });
+                    return;
+                }
+
+                var jReq = JObject.Parse(body);
+                var keyValue = jReq["key"]?.ToString()?.Trim();
+                var page = jReq["page"]?.Value<int?>() ?? 1;
+                if (page <= 0) { page = 1; }
+                const int pageSize = 200;
+                var skip = (page - 1) * pageSize;
+                if (string.IsNullOrEmpty(keyValue))
+                {
+                    context.Response.StatusCode = 400;
+                    await WriteJsonAsync(context.Response, new { success = false, message = "请输入API Key" });
+                    return;
+                }
+
+                var apiKey = _configService.FindApiKey(keyValue);
+                if (apiKey == null)
+                {
+                    context.Response.StatusCode = 404;
+                    await WriteJsonAsync(context.Response, new { success = false, message = "查询失败，请检查 Key 是否正确" });
+                    return;
+                }
+
+                // 从该 Key 的独立日志文件按页读取，并按时间倒序返回
+                var allLogs = _configService.GetKeyLogs(apiKey.Id, 0, int.MaxValue);
+                var total = allLogs.Count;
+                var logs = allLogs
+                    .OrderByDescending(l => l.Time)
+                    .Skip(skip)
+                    .Take(pageSize);
+                var arr = logs.Select(l => new JObject
+                {
+                    ["time"] = l.Time.ToString("yyyy-MM-dd HH:mm:ss"),
+                    ["model"] = l.ModelName ?? "",
+                    ["inputTokens"] = l.InputTokens,
+                    ["outputTokens"] = l.OutputTokens,
+                    ["durationMs"] = l.DurationMs,
+                    ["success"] = l.Success,
+                    ["errorMessage"] = l.ErrorMessage ?? ""
+                });
+
+                var result = new JObject
+                {
+                    ["success"] = true,
+                    ["data"] = new JObject
+                    {
+                        ["items"] = new JArray(arr),
+                        ["page"] = page,
+                        ["pageSize"] = pageSize,
+                        ["total"] = total,
+                        ["hasMore"] = skip + pageSize < total
+                    }
+                };
+
+                context.Response.StatusCode = 200;
+                await WriteJsonAsync(context.Response, result);
+            }
+            catch (Exception)
+            {
+                context.Response.StatusCode = 500;
+                await WriteJsonAsync(context.Response, new { success = false, message = "查询失败" });
+            }
+        }
+
         // 用户自助查询API：POST {"key":"fk-xxx"} → 返回Key信息
         private async Task HandlePortalKeyInfoAsync(HttpListenerContext context, string body)
         {
@@ -1486,6 +1568,21 @@ namespace FunAiGateway.Services
                         ["maxOutputTokens"] = m.MaxOutputTokens
                     });
 
+                // 读取该 Key 的最近调用记录首页（按时间倒序，每页 200 条）
+                // 存储：logs/keys/{KeyId}.log，每个 Key 一个文件
+                var recentLogs = _configService.GetKeyLogs(apiKey.Id, 0, 200)
+                    .OrderByDescending(l => l.Time)
+                    .Select(l => new JObject
+                    {
+                        ["time"] = l.Time.ToString("yyyy-MM-dd HH:mm:ss"),
+                        ["model"] = l.ModelName ?? "",
+                        ["inputTokens"] = l.InputTokens,
+                        ["outputTokens"] = l.OutputTokens,
+                        ["durationMs"] = l.DurationMs,
+                        ["success"] = l.Success,
+                        ["errorMessage"] = l.ErrorMessage ?? ""
+                    });
+
                 var result = new JObject
                 {
                     ["success"] = true,
@@ -1500,7 +1597,9 @@ namespace FunAiGateway.Services
                         ["expiresAt"] = apiKey.ExpiresAt.HasValue ? apiKey.ExpiresAt.Value.ToString("yyyy-MM-dd HH:mm") : null,
                         ["expiresAtDisplay"] = apiKey.ExpiresAt.HasValue ? apiKey.ExpiresAt.Value.ToString("yyyy-MM-dd HH:mm") : "永不过期",
                         ["isExpired"] = _configService.IsKeyExpired(apiKey),
-                        ["createdAt"] = apiKey.CreatedAt.ToString("yyyy-MM-dd HH:mm")
+                        ["createdAt"] = apiKey.CreatedAt.ToString("yyyy-MM-dd HH:mm"),
+                        // 最近调用记录（按时间倒序，最多 50 条）
+                        ["recentLogs"] = new JArray(recentLogs)
                     }
                 };
 
@@ -1552,6 +1651,15 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Mi
 .btn-primary { background:#4f8ef7; color:#fff; }
 .btn-primary:hover { opacity:.9; }
 .btn-primary:disabled { opacity:.5; cursor:not-allowed; }
+.btn-ghost { background:#f0f4ff; color:#4f8ef7; padding:8px 16px; font-size:14px; border:none; border-radius:6px; cursor:pointer; }
+.btn-ghost:hover { background:#e0eaff; }
+.btn-ghost:disabled { opacity:.5; cursor:not-allowed; }
+/* 剩余次数行内的刷新图标按钮 */
+.refresh-icon-btn { display:inline-flex; align-items:center; justify-content:center; margin-left:6px; padding:2px; border:none; background:transparent; cursor:pointer; color:#4f8ef7; vertical-align:middle; border-radius:4px; line-height:1; }
+.refresh-icon-btn:hover { background:#e8f4ff; }
+.refresh-icon-btn:disabled { opacity:.5; cursor:not-allowed; background:transparent; }
+.refresh-icon-btn svg { width:14px; height:14px; fill:currentColor; }
+.refresh-icon-btn.spinning svg { animation:spin 1s linear infinite; }
 .error { color:#e74c3c; font-size:14px; text-align:center; padding:8px; }
 .info-row { display:flex; justify-content:space-between; align-items:center; padding:12px 0; border-bottom:1px solid #f0f0f0; }
 .info-row:last-child { border-bottom:none; }
@@ -1579,6 +1687,16 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Mi
 .copy-btn.copied { background:#52c41a; color:#fff; border-color:#52c41a; }
 .model-table td:nth-child(2),.model-table td:nth-child(3) { color:#666; }
 .empty-tip { text-align:center; color:#ccc; padding:20px; font-size:14px; }
+/* 调用记录表格：外层包装支持横向滚动以适应窄屏 */
+.log-table-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+.log-table { width:100%; border-collapse:collapse; }
+.log-table th { text-align:left; padding:8px 6px; border-bottom:2px solid #f0f0f0; font-size:13px; color:#888; font-weight:600; white-space:nowrap; }
+.log-table td { padding:8px 6px; border-bottom:1px solid #f5f5f5; font-size:13px; white-space:nowrap; }
+.log-table td:first-child { color:#1a1a1a; }
+.log-table tr:last-child td { border-bottom:none; }
+.log-status-ok { color:#52c41a; }
+.log-status-fail { color:#f56c6c; }
+.log-empty { text-align:center; color:#ccc; padding:24px; font-size:14px; }
 .usage-block { margin-top:8px; }
 .usage-tab-bar { display:flex; border-bottom:2px solid #f0f0f0; margin-bottom:12px; }
 .usage-tab { padding:8px 16px; border:none; background:none; cursor:pointer; font-size:14px; color:#999; border-bottom:2px solid transparent; margin-bottom:-2px; }
@@ -1588,6 +1706,13 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Mi
 .code-block { background:#1e1e1e; color:#d4d4d4; padding:14px; border-radius:8px; font-family:'Consolas','Monaco',monospace; font-size:12px; line-height:1.6; overflow-x:auto; white-space:pre; word-break:normal; }
 .usage-tip { font-size:13px; color:#888; margin-top:8px; }
 .usage-tip code { background:#f0f0f0; padding:2px 6px; border-radius:4px; font-size:12px; color:#4f8ef7; }
+/* 主 Tab 切换栏：Key 信息 / 调用日志 */
+.main-tab-bar { display:flex; border-bottom:2px solid #f0f0f0; margin-bottom:16px; }
+.main-tab { padding:10px 20px; border:none; background:none; cursor:pointer; font-size:15px; color:#999; border-bottom:2px solid transparent; margin-bottom:-2px; }
+.main-tab.active { color:#4f8ef7; border-bottom-color:#4f8ef7; font-weight:600; }
+.main-tab-content { display:none; }
+.main-tab-content.active { display:block; }
+.toolbar { display:flex; justify-content:flex-end; margin-bottom:12px; }
 @media(max-width:480px) { .header h1 { font-size:20px; } .card { padding:16px; } .info-value { font-size:13px; } .model-table th,.model-table td { font-size:12px; } .code-block { font-size:11px; } }
 </style>
 </head>
@@ -1607,6 +1732,20 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Mi
   <div id=""resultArea""></div>
 </div>
 <script>
+// 当前查询的 Key 值，供 Tab 切换后单独刷新使用
+var currentKey='';
+var currentLogsPage=1;
+// 主 Tab 切换：0=Key 信息，1=调用日志
+function showMainTab(tab){
+  var tabs=document.getElementsByClassName('main-tab');
+  for(var i=0;i<tabs.length;i++)tabs[i].classList.remove('active');
+  tabs[tab].classList.add('active');
+  var contents=document.getElementsByClassName('main-tab-content');
+  for(var j=0;j<contents.length;j++)contents[j].classList.remove('active');
+  contents[tab].classList.add('active');
+  // 切换到""调用日志"" Tab 时自动加载日志，无需手动点击刷新
+  if(tab===1){refreshKeyLogs();}
+}
 function queryKey(){
   var key=document.getElementById('keyInput').value.trim();
   var errDiv=document.getElementById('errorDiv');
@@ -1614,6 +1753,8 @@ function queryKey(){
   var btn=document.getElementById('queryBtn');
   errDiv.style.display='none';
   if(!key){ errDiv.className='error'; errDiv.textContent='请输入API Key'; errDiv.style.display='block'; return; }
+  currentKey=key;
+  currentLogsPage=1;
   btn.disabled=true;
   resultArea.innerHTML='<div class=""loading""><div class=""spinner""></div>查询中...</div>';
   fetch('/portal/api/keyinfo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:key})})
@@ -1621,9 +1762,70 @@ function queryKey(){
     .then(function(res){
       btn.disabled=false;
       if(!res.success){ resultArea.innerHTML=''; errDiv.className='error'; errDiv.textContent=res.message||'查询失败'; errDiv.style.display='block'; return; }
+      renderKeyInfo(res.data);
+    })
+    .catch(function(e){
+      btn.disabled=false;
+      resultArea.innerHTML='';
+      errDiv.className='error'; errDiv.textContent='网络错误：'+e.message; errDiv.style.display='block';
+    });
+}
+// 渲染 Key 信息 + Tab 布局（Key 信息 / 调用日志）
+function renderKeyInfo(d){
+  var statusTag=d.enabled?(d.isExpired?'<span class=""tag tag-red"">已过期</span>':'<span class=""tag tag-green"">正常</span>'):'<span class=""tag tag-red"">已禁用</span>';
+  var callsTag=d.remainingCalls===0?'<span class=""tag tag-green"">无限</span>':d.remainingCalls;
+  var modelsHtml='';
+  if(d.models&&d.models.length>0){
+    modelsHtml='<table class=""model-table""><thead><tr><th>模型名称</th><th>上下文长度</th><th>最大输出</th></tr></thead><tbody>';
+    d.models.forEach(function(m){
+      modelsHtml+='<tr><td><span class=""model-name"">'+esc(m.name)+'</span><button class=""copy-btn"" data-name=""'+esc(m.name)+'"" onclick=""copyText(this)"">复制</button></td><td>'+formatNum(m.contextLength)+'</td><td>'+formatNum(m.maxOutputTokens)+'</td></tr>';
+    });
+    modelsHtml+='</tbody></table>';
+  } else {
+    modelsHtml='<div class=""empty-tip"">无可用模型</div>';
+  }
+  var infoHtml='<div class=""card"">';
+  infoHtml+='<div class=""info-row""><span class=""info-label"">Key名称</span><span class=""info-value"">'+esc(d.name)+'</span></div>';
+  infoHtml+='<div class=""info-row""><span class=""info-label"">状态</span><span class=""info-value"">'+statusTag+'</span></div>';
+  infoHtml+='<div class=""info-row""><span class=""info-label"">剩余次数</span><span class=""info-value"">'+callsTag+'<button class=""refresh-icon-btn"" id=""refreshInfoBtn"" onclick=""refreshKeyInfo()"" title=""刷新次数""><svg viewBox=""0 0 1024 1024"" xmlns=""http://www.w3.org/2000/svg""><path d=""M909.1 209.3l-56.4 44.1C775.8 155.1 656.2 92 521.9 92 290 92 102.3 279.5 102 511.5 101.7 743.7 289.8 932 521.9 932c181.3 0 335.8-115 394.6-276.1 1.5-4.2-.7-8.9-4.9-10.3l-56.7-19.5a8 8 0 0 0-10.1 4.8c-1.8 5-3.8 10-5.9 14.9-17.3 41-42.1 77.8-73.7 109.4A344.77 344.77 0 0 1 655.9 829c-42.3 17.9-87.4 27-133.8 27-46.5 0-91.5-9.1-133.8-27A341.5 341.5 0 0 1 279 755.2a342.16 342.16 0 0 1-73.7-109.4c-17.9-42.4-27-87.4-27-133.9 0-46.5 9.1-91.5 27-133.9 17.3-41 42.1-77.8 73.7-109.4 31.6-31.6 68.4-56.4 109.3-73.8 42.3-17.9 87.4-27 133.8-27 46.5 0 91.5 9.1 133.8 27a341.5 341.5 0 0 1 109.3 73.8c9.9 9.9 19.2 20.4 27.8 31.4l-60.2 47a8 8 0 0 0 3 14.1l175.6 43c5 1.2 9.9-2.6 9.9-7.7l.8-180.9c-.1-6.6-7.8-10.3-13-6.2z""/></svg></button></span></div>';
+  infoHtml+='<div class=""info-row""><span class=""info-label"">到期时间</span><span class=""info-value"">'+(d.expiresAt||'<span class=""tag tag-blue"">永不过期</span>')+'</span></div>';
+  infoHtml+='<div class=""info-row""><span class=""info-label"">创建时间</span><span class=""info-value"">'+d.createdAt+'</span></div>';
+  infoHtml+='</div>';
+  infoHtml+='<div class=""card"">';
+  infoHtml+='<div class=""section-title"">可用模型（'+d.allowedModels.length+'个）</div>';
+  infoHtml+=modelsHtml;
+  infoHtml+='</div>';
+  infoHtml+=getUsageGuide();
+
+  var html='<div class=""main-tab-bar"">';
+  html+='<button class=""main-tab active"" onclick=""showMainTab(0)"">Key 信息</button>';
+  html+='<button class=""main-tab"" onclick=""showMainTab(1)"">调用日志</button>';
+  html+='</div>';
+  // Tab1: Key 信息（刷新图标内嵌于剩余次数行）
+  html+='<div class=""main-tab-content active"" id=""tab-keyinfo"">';
+  html+='<div id=""keyInfoBody"">'+infoHtml+'</div>';
+  html+='</div>';
+  // Tab2: 调用日志（含刷新日志按钮）
+  html+='<div class=""main-tab-content"" id=""tab-logs"">';
+  html+='<div class=""toolbar""><button class=""btn-ghost"" id=""refreshLogsBtn"" onclick=""refreshKeyLogs()"">刷新日志</button></div>';
+  html+='<div id=""keyLogsBody""><div class=""log-empty"">点击""刷新日志""加载调用记录</div></div>';
+  html+='</div>';
+  document.getElementById('resultArea').innerHTML=html;
+}
+// 单独刷新 Key 信息（剩余次数等），不影响日志列表
+function refreshKeyInfo(){
+  if(!currentKey){return;}
+  var btn=document.getElementById('refreshInfoBtn');
+  if(btn){btn.disabled=true;btn.classList.add('spinning');}
+  fetch('/portal/api/keyinfo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:currentKey})})
+    .then(function(r){return r.json();})
+    .then(function(res){
+      if(btn){btn.disabled=false;btn.classList.remove('spinning');}
+      if(!res.success){return;}
       var d=res.data;
+      var body=document.getElementById('keyInfoBody');
+      if(!body){return;}
       var statusTag=d.enabled?(d.isExpired?'<span class=""tag tag-red"">已过期</span>':'<span class=""tag tag-green"">正常</span>'):'<span class=""tag tag-red"">已禁用</span>';
-      var expireTag=d.expiresAt?('过期：'+d.expiresAtDisplay):'<span class=""tag tag-blue"">永不过期</span>';
       var callsTag=d.remainingCalls===0?'<span class=""tag tag-green"">无限</span>':d.remainingCalls;
       var modelsHtml='';
       if(d.models&&d.models.length>0){
@@ -1635,25 +1837,51 @@ function queryKey(){
       } else {
         modelsHtml='<div class=""empty-tip"">无可用模型</div>';
       }
-      var html='<div class=""card"">';
-      html+='<div class=""info-row""><span class=""info-label"">Key名称</span><span class=""info-value"">'+esc(d.name)+'</span></div>';
-      html+='<div class=""info-row""><span class=""info-label"">状态</span><span class=""info-value"">'+statusTag+'</span></div>';
-      html+='<div class=""info-row""><span class=""info-label"">剩余次数</span><span class=""info-value"">'+callsTag+'</span></div>';
-      html+='<div class=""info-row""><span class=""info-label"">到期时间</span><span class=""info-value"">'+(d.expiresAt||'<span class=""tag tag-blue"">永不过期</span>')+'</span></div>';
-      html+='<div class=""info-row""><span class=""info-label"">创建时间</span><span class=""info-value"">'+d.createdAt+'</span></div>';
-      html+='</div>';
-      html+='<div class=""card"">';
-      html+='<div class=""section-title"">可用模型（'+d.allowedModels.length+'个）</div>';
-      html+=modelsHtml;
-      html+='</div>';
-      html+=getUsageGuide();
-      resultArea.innerHTML=html;
+      var infoHtml='<div class=""card"">';
+      infoHtml+='<div class=""info-row""><span class=""info-label"">Key名称</span><span class=""info-value"">'+esc(d.name)+'</span></div>';
+      infoHtml+='<div class=""info-row""><span class=""info-label"">状态</span><span class=""info-value"">'+statusTag+'</span></div>';
+      infoHtml+='<div class=""info-row""><span class=""info-label"">剩余次数</span><span class=""info-value"">'+callsTag+'<button class=""refresh-icon-btn"" id=""refreshInfoBtn"" onclick=""refreshKeyInfo()"" title=""刷新次数""><svg viewBox=""0 0 1024 1024"" xmlns=""http://www.w3.org/2000/svg""><path d=""M909.1 209.3l-56.4 44.1C775.8 155.1 656.2 92 521.9 92 290 92 102.3 279.5 102 511.5 101.7 743.7 289.8 932 521.9 932c181.3 0 335.8-115 394.6-276.1 1.5-4.2-.7-8.9-4.9-10.3l-56.7-19.5a8 8 0 0 0-10.1 4.8c-1.8 5-3.8 10-5.9 14.9-17.3 41-42.1 77.8-73.7 109.4A344.77 344.77 0 0 1 655.9 829c-42.3 17.9-87.4 27-133.8 27-46.5 0-91.5-9.1-133.8-27A341.5 341.5 0 0 1 279 755.2a342.16 342.16 0 0 1-73.7-109.4c-17.9-42.4-27-87.4-27-133.9 0-46.5 9.1-91.5 27-133.9 17.3-41 42.1-77.8 73.7-109.4 31.6-31.6 68.4-56.4 109.3-73.8 42.3-17.9 87.4-27 133.8-27 46.5 0 91.5 9.1 133.8 27a341.5 341.5 0 0 1 109.3 73.8c9.9 9.9 19.2 20.4 27.8 31.4l-60.2 47a8 8 0 0 0 3 14.1l175.6 43c5 1.2 9.9-2.6 9.9-7.7l.8-180.9c-.1-6.6-7.8-10.3-13-6.2z""/></svg></button></span></div>';
+      infoHtml+='<div class=""info-row""><span class=""info-label"">到期时间</span><span class=""info-value"">'+(d.expiresAt||'<span class=""tag tag-blue"">永不过期</span>')+'</span></div>';
+      infoHtml+='<div class=""info-row""><span class=""info-label"">创建时间</span><span class=""info-value"">'+d.createdAt+'</span></div>';
+      infoHtml+='</div>';
+      infoHtml+='<div class=""card"">';
+      infoHtml+='<div class=""section-title"">可用模型（'+d.allowedModels.length+'个）</div>';
+      infoHtml+=modelsHtml;
+      infoHtml+='</div>';
+      infoHtml+=getUsageGuide();
+      body.innerHTML=infoHtml;
     })
     .catch(function(e){
-      btn.disabled=false;
-      resultArea.innerHTML='';
-      errDiv.className='error'; errDiv.textContent='网络错误：'+e.message; errDiv.style.display='block';
+      if(btn){btn.disabled=false;btn.classList.remove('spinning');}
     });
+}
+// 单独刷新调用日志列表，不影响 Key 信息
+function refreshKeyLogs(page){
+  if(!currentKey){return;}
+  if(!page||page<=0){page=1;}
+  currentLogsPage=page;
+  var btn=document.getElementById('refreshLogsBtn');
+  if(btn){btn.disabled=true;btn.textContent='刷新中...';}
+  var body=document.getElementById('keyLogsBody');
+  if(body){body.innerHTML='<div class=""loading""><div class=""spinner""></div>加载中...</div>';}
+  fetch('/portal/api/keylogs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:currentKey,page:currentLogsPage})})
+    .then(function(r){return r.json();})
+    .then(function(res){
+      if(btn){btn.disabled=false;btn.textContent='刷新日志';}
+      if(!res.success){
+        if(body){body.innerHTML='<div class=""log-empty"">'+esc(res.message||'加载失败')+'</div>';}
+        return;
+      }
+      if(body){body.innerHTML=getRecentLogsHtml(res.data);}
+    })
+    .catch(function(e){
+      if(btn){btn.disabled=false;btn.textContent='刷新日志';}
+      if(body){body.innerHTML='<div class=""log-empty"">网络错误：'+esc(e.message)+'</div>';}
+    });
+}
+function changeLogsPage(page){
+  if(page<=0||page===currentLogsPage){return;}
+  refreshKeyLogs(page);
 }
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/""/g,'&quot;').replace(/'/g,'&#39;');}
 function formatNum(n){if(!n||n<=0)return '-';if(n>=1000000)return (n/1000000).toFixed(1)+'M';if(n>=1000)return (n/1000).toFixed(0)+'K';return n;}
@@ -1670,6 +1898,36 @@ function copyFallback(text,btn){
   document.body.removeChild(ta);
 }
 function showCopied(btn){var old=btn.textContent;btn.textContent='已复制';btn.classList.add('copied');setTimeout(function(){btn.textContent=old;btn.classList.remove('copied');},1500);}
+// 渲染调用日志卡片：时间/模型/输入Token/输出Token/延迟/状态
+function getRecentLogsHtml(data){
+  var logs=data&&data.items?data.items:data;
+  if(!logs||logs.length===0){
+    return '<div class=""log-empty"">暂无调用记录</div>';
+  }
+  var h='<div class=""toolbar"" style=""padding:0 0 10px 0;justify-content:space-between;gap:8px;flex-wrap:wrap;"">';
+  h+='<div class=""usage-tip"">第 '+(data.page||1)+' 页，每页 '+(data.pageSize||200)+' 条，共 '+(data.total||logs.length)+' 条</div>';
+  h+='<div style=""display:flex;gap:8px;"">';
+  h+='<button class=""btn-ghost"" '+((data.page||1)<=1?'disabled':'onclick=""changeLogsPage(' + ((data.page||1)-1) + ')""')+'>上一页</button>';
+  h+='<button class=""btn-ghost"" '+(!data.hasMore?'disabled':'onclick=""changeLogsPage(' + ((data.page||1)+1) + ')""')+'>下一页</button>';
+  h+='</div></div>';
+  h+='<div class=""log-table-wrap""><table class=""log-table""><thead><tr>';
+  h+='<th>时间</th><th>模型</th><th>输入Token</th><th>输出Token</th><th>延迟</th><th>状态</th>';
+  h+='</tr></thead><tbody>';
+  logs.forEach(function(l){
+    var dur=l.durationMs>=1000?(l.durationMs/1000).toFixed(2)+'s':l.durationMs+'ms';
+    var statusHtml=l.success?'<span class=""log-status-ok"">成功</span>':'<span class=""log-status-fail"">失败</span>';
+    h+='<tr>';
+    h+='<td>'+esc(l.time)+'</td>';
+    h+='<td>'+esc(l.model)+'</td>';
+    h+='<td>'+(l.inputTokens||0)+'</td>';
+    h+='<td>'+(l.outputTokens||0)+'</td>';
+    h+='<td>'+dur+'</td>';
+    h+='<td>'+statusHtml+'</td>';
+    h+='</tr>';
+  });
+  h+='</tbody></table></div>';
+  return h;
+}
 function getUsageGuide(){
   var base=window.location.origin;
   var h='<div class=""card"">';

@@ -16,14 +16,25 @@ namespace FunAiGateway.Services
         private static readonly string RequestLogDir = Path.Combine(LogDir, "requests");
         // 响应内容日志目录：exe目录下的 logs/responses 文件夹
         private static readonly string ResponseLogDir = Path.Combine(LogDir, "responses");
+        // 按 Key 独立存储的请求日志目录：exe目录下的 logs/keys 文件夹
+        // 每个 Key 一个独立文件，便于按 Key 查询和清理
+        private static readonly string KeyLogDir = Path.Combine(LogDir, "keys");
         // 单个日志文件最大大小（50MB），超过则分割
         private const long MaxLogSizeBytes = 50 * 1024 * 1024;
+        // 每个 Key 独立日志文件的最大保留条数
+        private const int MaxKeyLogCount = 100000;
 
         private readonly ConfigService _configService;
-        // 日志文件操作专用锁，避免并发写入冲突
+        // 全局日志文件操作专用锁，避免并发写入冲突
         private readonly object _logLock = new();
-        // 日志条数内存计数，避免每次写日志都扫描文件
+        // 全局日志条数内存计数，避免每次写日志都扫描文件
         private int _logLineCount = -1; // -1 表示尚未初始化
+
+        // 按 Key 日志文件操作专用锁，与全局日志锁分离避免互相阻塞
+        private readonly object _keyLogLock = new();
+        // 每个 Key 的日志条数内存计数，避免每次写日志都扫描文件
+        // Key: KeyId, Value: 行数（-1 表示尚未初始化）
+        private readonly Dictionary<string, int> _keyLogLineCounts = new();
 
         public LogService(ConfigService configService)
         {
@@ -90,9 +101,15 @@ namespace FunAiGateway.Services
                 }
                 catch { }
             }
+
+            // 同时写入按 Key 独立存储的日志文件（便于按 Key 查询和清理）
+            if (!string.IsNullOrEmpty(log.KeyId))
+            {
+                AddKeyLog(log);
+            }
         }
 
-        // 统计所有日志文件的总行数
+        // 统计所有全局日志文件的总行数
         private int CountAllLogLines()
         {
             try
@@ -314,6 +331,182 @@ namespace FunAiGateway.Services
             if (!_configService.Config.EnableResponseLog) { return; }
             if (!ShouldLogStatusCode(statusCode)) { return; }
             WriteResponseLog(channel.Name, statusCode, modelName, responseBody);
+        }
+
+        // ===================== 按 Key 独立存储的请求日志 =====================
+        // 存储位置：logs/keys/{KeyId}.log，每个 Key 一个文件，便于按 Key 查询和清理
+        // 单文件最多 MaxKeyLogCount (100000) 条，超过则裁剪最早的记录
+
+        // 获取指定 Key 的日志文件路径
+        private static string GetKeyLogFile(string keyId)
+        {
+            // KeyId 作为文件名，避免路径非法字符（实际 KeyId 为 GUID，无需额外处理，此处保护性处理）
+            var safeName = string.Join("_", keyId.Split(Path.GetInvalidFileNameChars()));
+            return Path.Combine(KeyLogDir, $"{safeName}.log");
+        }
+
+        // 将请求日志追加到该 Key 的独立日志文件
+        private void AddKeyLog(RequestLog log)
+        {
+            lock (_keyLogLock)
+            {
+                try
+                {
+                    Directory.CreateDirectory(KeyLogDir);
+                    var line = JsonConvert.SerializeObject(log, Formatting.None);
+                    var file = GetKeyLogFile(log.KeyId!);
+                    File.AppendAllText(file, line + Environment.NewLine);
+
+                    // 超过上限则裁剪最早的记录
+                    var maxCount = MaxKeyLogCount;
+                    if (maxCount > 0)
+                    {
+                        // 懒初始化该 Key 的行数计数
+                        if (!_keyLogLineCounts.TryGetValue(log.KeyId!, out var cnt))
+                        {
+                            cnt = CountKeyLogLines(log.KeyId!);
+                            _keyLogLineCounts[log.KeyId!] = cnt;
+                        }
+                        else
+                        {
+                            cnt++;
+                        }
+
+                        if (cnt > maxCount)
+                        {
+                            TrimKeyLogs(log.KeyId!, maxCount);
+                            _keyLogLineCounts[log.KeyId!] = CountKeyLogLines(log.KeyId!);
+                        }
+                        else
+                        {
+                            _keyLogLineCounts[log.KeyId!] = cnt;
+                        }
+                    }
+                }
+                catch { }
+            }
+
+            // 按保留天数清理过期的 Key 日志文件
+            CleanExpiredKeyLogs();
+        }
+
+        // 统计指定 Key 日志文件的总行数
+        private int CountKeyLogLines(string keyId)
+        {
+            try
+            {
+                var file = GetKeyLogFile(keyId);
+                if (!File.Exists(file)) return 0;
+                return File.ReadAllLines(file).Count(l => !string.IsNullOrWhiteSpace(l));
+            }
+            catch { return 0; }
+        }
+
+        // 裁剪指定 Key 的日志到指定条数（删除最早的记录）
+        private void TrimKeyLogs(string keyId, int maxCount)
+        {
+            if (maxCount <= 0) return;
+
+            try
+            {
+                var file = GetKeyLogFile(keyId);
+                if (!File.Exists(file)) return;
+
+                var lines = File.ReadAllLines(file).Where(l => !string.IsNullOrWhiteSpace(l)).ToList();
+                if (lines.Count <= maxCount) return;
+
+                // 保留最新的 maxCount 行
+                var keepLines = lines.Skip(lines.Count - maxCount).ToList();
+                File.WriteAllLines(file, keepLines);
+            }
+            catch { }
+        }
+
+        // 获取指定 Key 的日志分页（按文件原始顺序，旧的在前）
+        public List<RequestLog> GetKeyLogs(string keyId, int skip = 0, int take = 50)
+        {
+            try
+            {
+                var file = GetKeyLogFile(keyId);
+                if (!File.Exists(file)) return new();
+
+                if (skip < 0) { skip = 0; }
+                if (take <= 0) { take = 50; }
+
+                var lines = File.ReadAllLines(file).Where(l => !string.IsNullOrWhiteSpace(l)).ToList();
+                if (lines.Count == 0) return new();
+
+                var pageLines = lines.Skip(skip).Take(take).ToList();
+
+                var result = new List<RequestLog>();
+                foreach (var line in pageLines)
+                {
+                    var log = JsonConvert.DeserializeObject<RequestLog>(line);
+                    if (log != null)
+                    {
+                        result.Add(log);
+                    }
+                }
+                return result;
+            }
+            catch { return new(); }
+        }
+
+        // 删除指定 Key 的独立日志文件（删除 Key 时调用，清理其调用历史）
+        public void DeleteKeyLogs(string keyId)
+        {
+            lock (_keyLogLock)
+            {
+                try
+                {
+                    var file = GetKeyLogFile(keyId);
+                    if (File.Exists(file))
+                    {
+                        File.Delete(file);
+                    }
+                    _keyLogLineCounts.Remove(keyId);
+                }
+                catch { }
+            }
+        }
+
+        // 清空所有 Key 的独立日志文件
+        public void ClearKeyLogs()
+        {
+            lock (_keyLogLock)
+            {
+                try
+                {
+                    if (!Directory.Exists(KeyLogDir)) return;
+                    foreach (var file in Directory.GetFiles(KeyLogDir, "*.log"))
+                    {
+                        try { File.Delete(file); } catch { }
+                    }
+                    _keyLogLineCounts.Clear();
+                }
+                catch { }
+            }
+        }
+
+        // 清理超过保留天数的 Key 日志文件
+        private void CleanExpiredKeyLogs()
+        {
+            try
+            {
+                if (!Directory.Exists(KeyLogDir)) return;
+                var retentionDays = _configService.Config.LogRetentionDays;
+                if (retentionDays <= 0) return;
+                var cutoff = DateTime.Now.AddDays(-retentionDays);
+
+                foreach (var file in Directory.GetFiles(KeyLogDir, "*.log"))
+                {
+                    if (File.GetCreationTime(file) < cutoff)
+                    {
+                        try { File.Delete(file); } catch { }
+                    }
+                }
+            }
+            catch { }
         }
     }
 }

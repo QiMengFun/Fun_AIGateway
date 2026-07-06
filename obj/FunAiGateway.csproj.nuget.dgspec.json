@@ -1,20 +1,24 @@
 {
   "format": 1,
   "restore": {
-    "I:\\A源码存储\\CSharp商业项目\\AI中转\\FunAiGateway\\FunAiGateway.csproj": {}
+    "E:\\A源码存储\\CSharp商业项目\\AI中转\\FunAiGateway\\FunAiGateway.csproj": {}
   },
   "projects": {
-    "I:\\A源码存储\\CSharp商业项目\\AI中转\\FunAiGateway\\FunAiGateway.csproj": {
+    "E:\\A源码存储\\CSharp商业项目\\AI中转\\FunAiGateway\\FunAiGateway.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "I:\\A源码存储\\CSharp商业项目\\AI中转\\FunAiGateway\\FunAiGateway.csproj",
+        "projectUniqueName": "E:\\A源码存储\\CSharp商业项目\\AI中转\\FunAiGateway\\FunAiGateway.csproj",
         "projectName": "FunAiGateway",
-        "projectPath": "I:\\A源码存储\\CSharp商业项目\\AI中转\\FunAiGateway\\FunAiGateway.csproj",
-        "packagesPath": "C:\\Users\\13740\\.nuget\\packages\\",
-        "outputPath": "I:\\A源码存储\\CSharp商业项目\\AI中转\\FunAiGateway\\obj\\",
+        "projectPath": "E:\\A源码存储\\CSharp商业项目\\AI中转\\FunAiGateway\\FunAiGateway.csproj",
+        "packagesPath": "C:\\Users\\Admin\\.nuget\\packages\\",
+        "outputPath": "E:\\A源码存储\\CSharp商业项目\\AI中转\\FunAiGateway\\obj\\",
         "projectStyle": "PackageReference",
+        "fallbackFolders": [
+          "D:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
+        ],
         "configFilePaths": [
-          "C:\\Users\\13740\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Users\\Admin\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
           "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
         ],
         "originalTargetFrameworks": [
@@ -22,11 +26,11 @@
         ],
         "sources": {
           "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
+          "C:\\Program Files\\dotnet\\library-packs": {},
           "https://api.nuget.org/v3/index.json": {}
         },
         "frameworks": {
-          "net8.0-windows": {
-            "framework": "net8.0-windows7.0",
+          "net8.0-windows7.0": {
             "targetAlias": "net8.0-windows",
             "projectReferences": {}
           }
@@ -41,17 +45,16 @@
           "auditLevel": "low",
           "auditMode": "direct"
         },
-        "SdkAnalysisLevel": "10.0.300"
+        "SdkAnalysisLevel": "9.0.300"
       },
       "frameworks": {
-        "net8.0-windows": {
-          "framework": "net8.0-windows7.0",
+        "net8.0-windows7.0": {
           "targetAlias": "net8.0-windows",
           "dependencies": {
             "Microsoft.NET.ILLink.Tasks": {
               "suppressParent": "All",
               "target": "Package",
-              "version": "[8.0.28, )",
+              "version": "[8.0.19, )",
               "autoReferenced": true
             },
             "Newtonsoft.Json": {
@@ -77,15 +80,15 @@
           "downloadDependencies": [
             {
               "name": "Microsoft.AspNetCore.App.Runtime.win-x64",
-              "version": "[8.0.28, 8.0.28]"
+              "version": "[8.0.19, 8.0.19]"
             },
             {
               "name": "Microsoft.NETCore.App.Runtime.win-x64",
-              "version": "[8.0.28, 8.0.28]"
+              "version": "[8.0.19, 8.0.19]"
             },
             {
               "name": "Microsoft.WindowsDesktop.App.Runtime.win-x64",
-              "version": "[8.0.28, 8.0.28]"
+              "version": "[8.0.19, 8.0.19]"
             }
           ],
           "frameworkReferences": {
@@ -96,7 +99,7 @@
               "privateAssets": "none"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.301/PortableRuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.304/PortableRuntimeIdentifierGraph.json"
         }
       },
       "runtimes": {

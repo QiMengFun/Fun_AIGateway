@@ -226,6 +226,7 @@ namespace FunAiGateway.Services
         }
 
         // 删除 API Key
+        // 同时清理该 Key 的独立调用记录日志，避免残留无主数据
         public void DeleteApiKey(string keyId)
         {
             lock (_lock)
@@ -233,6 +234,8 @@ namespace FunAiGateway.Services
                 _config.ApiKeys.RemoveAll(k => k.Id == keyId);
                 Save();
             }
+            // 删除该 Key 的独立日志文件（在锁外执行，避免与日志写入互相阻塞）
+            try { LogService.DeleteKeyLogs(keyId); } catch { }
         }
 
         // 根据 Key 值查找启用的 ApiKeyConfig（用于请求鉴权）
@@ -316,5 +319,15 @@ namespace FunAiGateway.Services
 
         // 清空所有响应日志文件
         public void ClearResponseLogs() => LogService.ClearResponseLogs();
+
+        // 获取指定 Key 的日志分页（按文件原始顺序，旧的在前）
+        // 数据来源：logs/keys/{KeyId}.log 独立文件
+        public List<RequestLog> GetKeyLogs(string keyId, int skip = 0, int take = 50) => LogService.GetKeyLogs(keyId, skip, take);
+
+        // 删除指定 Key 的独立调用记录日志文件
+        public void DeleteKeyLogs(string keyId) => LogService.DeleteKeyLogs(keyId);
+
+        // 清空所有 Key 的独立调用记录日志文件
+        public void ClearKeyLogs() => LogService.ClearKeyLogs();
     }
 }

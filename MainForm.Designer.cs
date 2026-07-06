@@ -39,6 +39,9 @@ namespace FunAiGateway
         private UILabel lblModelsInfo;
         private UITextBox txtModelsUrl;
         private UIButton btnCopyModels;
+        private UILabel lblPortalInfo;
+        private UITextBox txtPortalUrl;
+        private UIButton btnCopyPortal;
 
         // 渠道页
         private Sunny.UI.UIDataGridView dgvChannels;
@@ -46,12 +49,18 @@ namespace FunAiGateway
         private UIButton btnEditChannel;
         private UIButton btnDeleteChannel;
         private UIButton btnToggleChannel;
+        private ContextMenuStrip channelContextMenu;
+        private ToolStripMenuItem tsmiDuplicateChannel;
 
         // 日志页
         private Sunny.UI.UIDataGridView dgvLogs;
-        private UITextBox txtLogOutput;
+        private UIListBox lstLogOutput;
         private UIButton btnClearLogs;
         private UIButton btnLogSettings;
+        private ContextMenuStrip logContextMenu;
+        private ToolStripMenuItem tsmiCopySelected;
+        private ToolStripMenuItem tsmiCopyAll;
+        private ToolStripMenuItem tsmiClearLogs;
 
         // 密钥管理页
         // dgvKeys 与 uiDataGridView1 是同一控件（uiDataGridView1 在 tabKeys 页初始化）
@@ -73,6 +82,7 @@ namespace FunAiGateway
 
         private void InitializeComponent()
         {
+            components = new System.ComponentModel.Container();
             DataGridViewCellStyle dataGridViewCellStyle1 = new DataGridViewCellStyle();
             DataGridViewCellStyle dataGridViewCellStyle2 = new DataGridViewCellStyle();
             DataGridViewCellStyle dataGridViewCellStyle3 = new DataGridViewCellStyle();
@@ -116,6 +126,9 @@ namespace FunAiGateway
             lblModelsInfo = new UILabel();
             txtModelsUrl = new UITextBox();
             btnCopyModels = new UIButton();
+            lblPortalInfo = new UILabel();
+            txtPortalUrl = new UITextBox();
+            btnCopyPortal = new UIButton();
             tabKeys = new TabPage();
             btnAddKey = new UIButton();
             btnDeleteKey = new UIButton();
@@ -123,13 +136,19 @@ namespace FunAiGateway
             uiDataGridView1 = new UIDataGridView();
             tabChannels = new TabPage();
             dgvChannels = new UIDataGridView();
+            channelContextMenu = new ContextMenuStrip(components);
+            tsmiDuplicateChannel = new ToolStripMenuItem();
             btnAddChannel = new UIButton();
             btnEditChannel = new UIButton();
             btnDeleteChannel = new UIButton();
             btnToggleChannel = new UIButton();
             tabLogs = new TabPage();
             dgvLogs = new UIDataGridView();
-            txtLogOutput = new UITextBox();
+            lstLogOutput = new UIListBox();
+            logContextMenu = new ContextMenuStrip(components);
+            tsmiCopySelected = new ToolStripMenuItem();
+            tsmiCopyAll = new ToolStripMenuItem();
+            tsmiClearLogs = new ToolStripMenuItem();
             btnClearLogs = new UIButton();
             btnLogSettings = new UIButton();
             statusStrip = new StatusStrip();
@@ -144,18 +163,20 @@ namespace FunAiGateway
             ((System.ComponentModel.ISupportInitialize)uiDataGridView1).BeginInit();
             tabChannels.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)dgvChannels).BeginInit();
+            channelContextMenu.SuspendLayout();
             tabLogs.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)dgvLogs).BeginInit();
+            logContextMenu.SuspendLayout();
             statusStrip.SuspendLayout();
             SuspendLayout();
             // 
             // tabControl
             // 
+            tabControl.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
             tabControl.Controls.Add(tabSettings);
             tabControl.Controls.Add(tabKeys);
             tabControl.Controls.Add(tabChannels);
             tabControl.Controls.Add(tabLogs);
-            tabControl.Dock = DockStyle.Fill;
             tabControl.DrawMode = TabDrawMode.OwnerDrawFixed;
             tabControl.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
             tabControl.ItemSize = new Size(150, 40);
@@ -163,7 +184,7 @@ namespace FunAiGateway
             tabControl.MainPage = "";
             tabControl.Name = "tabControl";
             tabControl.SelectedIndex = 0;
-            tabControl.Size = new Size(900, 552);
+            tabControl.Size = new Size(1163, 552);
             tabControl.SizeMode = TabSizeMode.Fixed;
             tabControl.TabIndex = 0;
             tabControl.TabUnSelectedForeColor = Color.FromArgb(240, 240, 240);
@@ -180,12 +201,13 @@ namespace FunAiGateway
             tabSettings.Controls.Add(grpConnectionInfo);
             tabSettings.Location = new Point(0, 40);
             tabSettings.Name = "tabSettings";
-            tabSettings.Size = new Size(900, 512);
+            tabSettings.Size = new Size(1163, 512);
             tabSettings.TabIndex = 0;
             tabSettings.Text = "设置";
             // 
             // grpNetwork
             // 
+            grpNetwork.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
             grpNetwork.Controls.Add(uiButton2);
             grpNetwork.Controls.Add(uiButton1);
             grpNetwork.Controls.Add(lblPort);
@@ -202,7 +224,7 @@ namespace FunAiGateway
             grpNetwork.MinimumSize = new Size(1, 1);
             grpNetwork.Name = "grpNetwork";
             grpNetwork.Padding = new Padding(0, 32, 0, 0);
-            grpNetwork.Size = new Size(892, 110);
+            grpNetwork.Size = new Size(1155, 110);
             grpNetwork.TabIndex = 0;
             grpNetwork.Text = "网络设置";
             grpNetwork.TextAlignment = ContentAlignment.MiddleLeft;
@@ -257,7 +279,7 @@ namespace FunAiGateway
             rdoLocal.BackColor = Color.Transparent;
             rdoLocal.Checked = true;
             rdoLocal.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
-            rdoLocal.Location = new Point(685, 65);
+            rdoLocal.Location = new Point(584, 66);
             rdoLocal.MinimumSize = new Size(1, 1);
             rdoLocal.Name = "rdoLocal";
             rdoLocal.Size = new Size(204, 29);
@@ -268,7 +290,7 @@ namespace FunAiGateway
             // 
             rdoBroadcast.BackColor = Color.Transparent;
             rdoBroadcast.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
-            rdoBroadcast.Location = new Point(685, 30);
+            rdoBroadcast.Location = new Point(584, 31);
             rdoBroadcast.MinimumSize = new Size(1, 1);
             rdoBroadcast.Name = "rdoBroadcast";
             rdoBroadcast.Size = new Size(204, 29);
@@ -355,8 +377,9 @@ namespace FunAiGateway
             // 
             // btnSaveSettings
             // 
+            btnSaveSettings.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             btnSaveSettings.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
-            btnSaveSettings.Location = new Point(766, 123);
+            btnSaveSettings.Location = new Point(1017, 123);
             btnSaveSettings.MinimumSize = new Size(1, 1);
             btnSaveSettings.Name = "btnSaveSettings";
             btnSaveSettings.Size = new Size(130, 40);
@@ -379,6 +402,7 @@ namespace FunAiGateway
             // 
             // grpConnectionInfo
             // 
+            grpConnectionInfo.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
             grpConnectionInfo.Controls.Add(lblOpenAIInfo);
             grpConnectionInfo.Controls.Add(txtOpenAIUrl);
             grpConnectionInfo.Controls.Add(btnCopyOpenAI);
@@ -388,13 +412,16 @@ namespace FunAiGateway
             grpConnectionInfo.Controls.Add(lblModelsInfo);
             grpConnectionInfo.Controls.Add(txtModelsUrl);
             grpConnectionInfo.Controls.Add(btnCopyModels);
+            grpConnectionInfo.Controls.Add(lblPortalInfo);
+            grpConnectionInfo.Controls.Add(txtPortalUrl);
+            grpConnectionInfo.Controls.Add(btnCopyPortal);
             grpConnectionInfo.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
             grpConnectionInfo.Location = new Point(4, 171);
             grpConnectionInfo.Margin = new Padding(4, 5, 4, 5);
             grpConnectionInfo.MinimumSize = new Size(1, 1);
             grpConnectionInfo.Name = "grpConnectionInfo";
             grpConnectionInfo.Padding = new Padding(0, 32, 0, 0);
-            grpConnectionInfo.Size = new Size(892, 336);
+            grpConnectionInfo.Size = new Size(1155, 336);
             grpConnectionInfo.TabIndex = 5;
             grpConnectionInfo.Text = "连接信息";
             grpConnectionInfo.TextAlignment = ContentAlignment.MiddleLeft;
@@ -412,6 +439,7 @@ namespace FunAiGateway
             // 
             // txtOpenAIUrl
             // 
+            txtOpenAIUrl.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
             txtOpenAIUrl.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
             txtOpenAIUrl.Location = new Point(16, 48);
             txtOpenAIUrl.Margin = new Padding(4, 5, 4, 5);
@@ -420,15 +448,16 @@ namespace FunAiGateway
             txtOpenAIUrl.Padding = new Padding(5);
             txtOpenAIUrl.ReadOnly = true;
             txtOpenAIUrl.ShowText = false;
-            txtOpenAIUrl.Size = new Size(791, 29);
+            txtOpenAIUrl.Size = new Size(1045, 29);
             txtOpenAIUrl.TabIndex = 1;
             txtOpenAIUrl.TextAlignment = ContentAlignment.MiddleLeft;
             txtOpenAIUrl.Watermark = "";
             // 
             // btnCopyOpenAI
             // 
+            btnCopyOpenAI.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             btnCopyOpenAI.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
-            btnCopyOpenAI.Location = new Point(814, 45);
+            btnCopyOpenAI.Location = new Point(1068, 45);
             btnCopyOpenAI.MinimumSize = new Size(1, 1);
             btnCopyOpenAI.Name = "btnCopyOpenAI";
             btnCopyOpenAI.Size = new Size(75, 32);
@@ -449,6 +478,7 @@ namespace FunAiGateway
             // 
             // txtAnthropicUrl
             // 
+            txtAnthropicUrl.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
             txtAnthropicUrl.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
             txtAnthropicUrl.Location = new Point(16, 105);
             txtAnthropicUrl.Margin = new Padding(4, 5, 4, 5);
@@ -457,15 +487,16 @@ namespace FunAiGateway
             txtAnthropicUrl.Padding = new Padding(5);
             txtAnthropicUrl.ReadOnly = true;
             txtAnthropicUrl.ShowText = false;
-            txtAnthropicUrl.Size = new Size(791, 29);
+            txtAnthropicUrl.Size = new Size(1045, 29);
             txtAnthropicUrl.TabIndex = 4;
             txtAnthropicUrl.TextAlignment = ContentAlignment.MiddleLeft;
             txtAnthropicUrl.Watermark = "";
             // 
             // btnCopyAnthropic
             // 
+            btnCopyAnthropic.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             btnCopyAnthropic.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
-            btnCopyAnthropic.Location = new Point(814, 102);
+            btnCopyAnthropic.Location = new Point(1068, 102);
             btnCopyAnthropic.MinimumSize = new Size(1, 1);
             btnCopyAnthropic.Name = "btnCopyAnthropic";
             btnCopyAnthropic.Size = new Size(75, 32);
@@ -486,6 +517,7 @@ namespace FunAiGateway
             // 
             // txtModelsUrl
             // 
+            txtModelsUrl.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
             txtModelsUrl.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
             txtModelsUrl.Location = new Point(16, 162);
             txtModelsUrl.Margin = new Padding(4, 5, 4, 5);
@@ -494,21 +526,61 @@ namespace FunAiGateway
             txtModelsUrl.Padding = new Padding(5);
             txtModelsUrl.ReadOnly = true;
             txtModelsUrl.ShowText = false;
-            txtModelsUrl.Size = new Size(791, 29);
+            txtModelsUrl.Size = new Size(1045, 29);
             txtModelsUrl.TabIndex = 7;
             txtModelsUrl.TextAlignment = ContentAlignment.MiddleLeft;
             txtModelsUrl.Watermark = "";
             // 
             // btnCopyModels
             // 
+            btnCopyModels.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             btnCopyModels.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
-            btnCopyModels.Location = new Point(814, 159);
+            btnCopyModels.Location = new Point(1068, 159);
             btnCopyModels.MinimumSize = new Size(1, 1);
             btnCopyModels.Name = "btnCopyModels";
             btnCopyModels.Size = new Size(75, 32);
             btnCopyModels.TabIndex = 8;
             btnCopyModels.Text = "复制";
             btnCopyModels.TipsFont = new Font("宋体", 9F, FontStyle.Regular, GraphicsUnit.Point, 134);
+            // 
+            // lblPortalInfo
+            // 
+            lblPortalInfo.BackColor = Color.Transparent;
+            lblPortalInfo.Font = new Font("Microsoft YaHei UI", 9F, FontStyle.Bold);
+            lblPortalInfo.ForeColor = Color.FromArgb(48, 48, 48);
+            lblPortalInfo.Location = new Point(16, 195);
+            lblPortalInfo.Name = "lblPortalInfo";
+            lblPortalInfo.Size = new Size(120, 23);
+            lblPortalInfo.TabIndex = 9;
+            lblPortalInfo.Text = "网页端 (Portal):";
+            // 
+            // txtPortalUrl
+            // 
+            txtPortalUrl.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            txtPortalUrl.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
+            txtPortalUrl.Location = new Point(16, 218);
+            txtPortalUrl.Margin = new Padding(4, 5, 4, 5);
+            txtPortalUrl.MinimumSize = new Size(1, 16);
+            txtPortalUrl.Name = "txtPortalUrl";
+            txtPortalUrl.Padding = new Padding(5);
+            txtPortalUrl.ReadOnly = true;
+            txtPortalUrl.ShowText = false;
+            txtPortalUrl.Size = new Size(1045, 32);
+            txtPortalUrl.TabIndex = 10;
+            txtPortalUrl.TextAlignment = ContentAlignment.MiddleLeft;
+            txtPortalUrl.Watermark = "";
+            // 
+            // btnCopyPortal
+            // 
+            btnCopyPortal.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            btnCopyPortal.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
+            btnCopyPortal.Location = new Point(1068, 218);
+            btnCopyPortal.MinimumSize = new Size(1, 1);
+            btnCopyPortal.Name = "btnCopyPortal";
+            btnCopyPortal.Size = new Size(75, 32);
+            btnCopyPortal.TabIndex = 11;
+            btnCopyPortal.Text = "复制";
+            btnCopyPortal.TipsFont = new Font("宋体", 9F, FontStyle.Regular, GraphicsUnit.Point, 134);
             // 
             // tabKeys
             // 
@@ -560,8 +632,10 @@ namespace FunAiGateway
             // 
             uiDataGridView1.AllowUserToAddRows = false;
             uiDataGridView1.AllowUserToDeleteRows = false;
+            uiDataGridView1.AllowUserToResizeRows = false;
             dataGridViewCellStyle1.BackColor = Color.FromArgb(235, 243, 255);
             uiDataGridView1.AlternatingRowsDefaultCellStyle = dataGridViewCellStyle1;
+            uiDataGridView1.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
             uiDataGridView1.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
             uiDataGridView1.BackgroundColor = Color.White;
             uiDataGridView1.BorderStyle = BorderStyle.None;
@@ -581,8 +655,8 @@ namespace FunAiGateway
             dataGridViewCellStyle3.BackColor = SystemColors.Window;
             dataGridViewCellStyle3.Font = new Font("宋体", 9F, FontStyle.Regular, GraphicsUnit.Point, 134);
             dataGridViewCellStyle3.ForeColor = Color.FromArgb(48, 48, 48);
-            dataGridViewCellStyle3.SelectionBackColor = SystemColors.Window;
-            dataGridViewCellStyle3.SelectionForeColor = Color.FromArgb(48, 48, 48);
+            dataGridViewCellStyle3.SelectionBackColor = Color.FromArgb(64, 158, 255);
+            dataGridViewCellStyle3.SelectionForeColor = Color.White;
             dataGridViewCellStyle3.WrapMode = DataGridViewTriState.False;
             uiDataGridView1.DefaultCellStyle = dataGridViewCellStyle3;
             uiDataGridView1.EnableHeadersVisualStyles = false;
@@ -607,7 +681,7 @@ namespace FunAiGateway
             uiDataGridView1.RowTemplate.Height = 24;
             uiDataGridView1.SelectedIndex = -1;
             uiDataGridView1.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
-            uiDataGridView1.Size = new Size(887, 466);
+            uiDataGridView1.Size = new Size(190, 466);
             uiDataGridView1.StripeOddColor = Color.FromArgb(235, 243, 255);
             uiDataGridView1.TabIndex = 3;
             uiDataGridView1.TabStop = false;
@@ -629,8 +703,10 @@ namespace FunAiGateway
             // 
             dgvChannels.AllowUserToAddRows = false;
             dgvChannels.AllowUserToDeleteRows = false;
+            dgvChannels.AllowUserToResizeRows = false;
             dataGridViewCellStyle6.BackColor = Color.FromArgb(235, 243, 255);
             dgvChannels.AlternatingRowsDefaultCellStyle = dataGridViewCellStyle6;
+            dgvChannels.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
             dgvChannels.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
             dgvChannels.BackgroundColor = Color.White;
             dgvChannels.BorderStyle = BorderStyle.None;
@@ -646,6 +722,7 @@ namespace FunAiGateway
             dgvChannels.ColumnHeadersDefaultCellStyle = dataGridViewCellStyle7;
             dgvChannels.ColumnHeadersHeight = 32;
             dgvChannels.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
+            dgvChannels.ContextMenuStrip = channelContextMenu;
             dataGridViewCellStyle8.Alignment = DataGridViewContentAlignment.MiddleLeft;
             dataGridViewCellStyle8.BackColor = SystemColors.Window;
             dataGridViewCellStyle8.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
@@ -676,9 +753,21 @@ namespace FunAiGateway
             dgvChannels.RowsDefaultCellStyle = dataGridViewCellStyle10;
             dgvChannels.SelectedIndex = -1;
             dgvChannels.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
-            dgvChannels.Size = new Size(887, 466);
+            dgvChannels.Size = new Size(190, 466);
             dgvChannels.StripeOddColor = Color.FromArgb(235, 243, 255);
             dgvChannels.TabIndex = 0;
+            // 
+            // channelContextMenu
+            // 
+            channelContextMenu.Items.AddRange(new ToolStripItem[] { tsmiDuplicateChannel });
+            channelContextMenu.Name = "channelContextMenu";
+            channelContextMenu.Size = new Size(125, 26);
+            // 
+            // tsmiDuplicateChannel
+            // 
+            tsmiDuplicateChannel.Name = "tsmiDuplicateChannel";
+            tsmiDuplicateChannel.Size = new Size(124, 22);
+            tsmiDuplicateChannel.Text = "生成副本";
             // 
             // btnAddChannel
             // 
@@ -727,7 +816,7 @@ namespace FunAiGateway
             // tabLogs
             // 
             tabLogs.Controls.Add(dgvLogs);
-            tabLogs.Controls.Add(txtLogOutput);
+            tabLogs.Controls.Add(lstLogOutput);
             tabLogs.Controls.Add(btnClearLogs);
             tabLogs.Controls.Add(btnLogSettings);
             tabLogs.Location = new Point(0, 40);
@@ -740,8 +829,10 @@ namespace FunAiGateway
             // 
             dgvLogs.AllowUserToAddRows = false;
             dgvLogs.AllowUserToDeleteRows = false;
+            dgvLogs.AllowUserToResizeRows = false;
             dataGridViewCellStyle11.BackColor = Color.FromArgb(235, 243, 255);
             dgvLogs.AlternatingRowsDefaultCellStyle = dataGridViewCellStyle11;
+            dgvLogs.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
             dgvLogs.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
             dgvLogs.BackgroundColor = Color.White;
             dgvLogs.BorderStyle = BorderStyle.None;
@@ -787,31 +878,59 @@ namespace FunAiGateway
             dgvLogs.RowTemplate.Height = 24;
             dgvLogs.SelectedIndex = -1;
             dgvLogs.SelectionMode = DataGridViewSelectionMode.CellSelect;
-            dgvLogs.Size = new Size(887, 280);
+            dgvLogs.Size = new Size(189, 280);
             dgvLogs.StripeOddColor = Color.FromArgb(235, 243, 255);
             dgvLogs.TabIndex = 0;
             dgvLogs.TabStop = false;
             // 
-            // txtLogOutput
+            // lstLogOutput
             // 
-            txtLogOutput.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
-            txtLogOutput.Location = new Point(8, 325);
-            txtLogOutput.Margin = new Padding(4, 5, 4, 5);
-            txtLogOutput.MinimumSize = new Size(1, 16);
-            txtLogOutput.Multiline = true;
-            txtLogOutput.Name = "txtLogOutput";
-            txtLogOutput.Padding = new Padding(5);
-            txtLogOutput.ReadOnly = true;
-            txtLogOutput.ShowText = false;
-            txtLogOutput.Size = new Size(887, 180);
-            txtLogOutput.TabIndex = 1;
-            txtLogOutput.TextAlignment = ContentAlignment.MiddleLeft;
-            txtLogOutput.Watermark = "";
+            lstLogOutput.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            lstLogOutput.ContextMenuStrip = logContextMenu;
+            lstLogOutput.Font = new Font("宋体", 8F, FontStyle.Regular, GraphicsUnit.Point, 134);
+            lstLogOutput.HoverColor = Color.FromArgb(155, 200, 255);
+            lstLogOutput.ItemHeight = 14;
+            lstLogOutput.ItemSelectForeColor = Color.White;
+            lstLogOutput.Location = new Point(8, 325);
+            lstLogOutput.Margin = new Padding(4, 5, 4, 5);
+            lstLogOutput.MinimumSize = new Size(1, 16);
+            lstLogOutput.Name = "lstLogOutput";
+            lstLogOutput.Padding = new Padding(5);
+            lstLogOutput.ShowText = false;
+            lstLogOutput.Size = new Size(188, 180);
+            lstLogOutput.TabIndex = 1;
+            lstLogOutput.TabStop = false;
+            lstLogOutput.Text = null;
+            // 
+            // logContextMenu
+            // 
+            logContextMenu.Items.AddRange(new ToolStripItem[] { tsmiCopySelected, tsmiCopyAll, tsmiClearLogs });
+            logContextMenu.Name = "logContextMenu";
+            logContextMenu.Size = new Size(137, 70);
+            // 
+            // tsmiCopySelected
+            // 
+            tsmiCopySelected.Name = "tsmiCopySelected";
+            tsmiCopySelected.Size = new Size(136, 22);
+            tsmiCopySelected.Text = "复制所选行";
+            // 
+            // tsmiCopyAll
+            // 
+            tsmiCopyAll.Name = "tsmiCopyAll";
+            tsmiCopyAll.Size = new Size(136, 22);
+            tsmiCopyAll.Text = "复制全部";
+            // 
+            // tsmiClearLogs
+            // 
+            tsmiClearLogs.Name = "tsmiClearLogs";
+            tsmiClearLogs.Size = new Size(136, 22);
+            tsmiClearLogs.Text = "清空";
             // 
             // btnClearLogs
             // 
+            btnClearLogs.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             btnClearLogs.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
-            btnClearLogs.Location = new Point(789, 8);
+            btnClearLogs.Location = new Point(97, 8);
             btnClearLogs.MinimumSize = new Size(1, 1);
             btnClearLogs.Name = "btnClearLogs";
             btnClearLogs.Size = new Size(100, 23);
@@ -832,10 +951,13 @@ namespace FunAiGateway
             // 
             // statusStrip
             // 
+            statusStrip.Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
+            statusStrip.AutoSize = false;
+            statusStrip.Dock = DockStyle.None;
             statusStrip.Items.AddRange(new ToolStripItem[] { lblStatus, lblRequestCount });
             statusStrip.Location = new Point(0, 587);
             statusStrip.Name = "statusStrip";
-            statusStrip.Size = new Size(900, 22);
+            statusStrip.Size = new Size(1159, 22);
             statusStrip.TabIndex = 1;
             // 
             // lblStatus
@@ -851,7 +973,7 @@ namespace FunAiGateway
             // MainForm
             // 
             AutoScaleMode = AutoScaleMode.None;
-            ClientSize = new Size(900, 609);
+            ClientSize = new Size(1163, 609);
             Controls.Add(tabControl);
             Controls.Add(statusStrip);
             Icon = (Icon)resources.GetObject("$this.Icon");
@@ -868,12 +990,13 @@ namespace FunAiGateway
             ((System.ComponentModel.ISupportInitialize)uiDataGridView1).EndInit();
             tabChannels.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)dgvChannels).EndInit();
+            channelContextMenu.ResumeLayout(false);
             tabLogs.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)dgvLogs).EndInit();
+            logContextMenu.ResumeLayout(false);
             statusStrip.ResumeLayout(false);
             statusStrip.PerformLayout();
             ResumeLayout(false);
-            PerformLayout();
         }
 
         private UIButton uiButton1;

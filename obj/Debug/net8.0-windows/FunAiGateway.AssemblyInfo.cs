@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("FunAiGateway")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+76a55ab208db9248afb2848490bbd9fd1acd0d54")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+4a14fb4be646dcd14700887d09058e6b3187ae3c")]
 [assembly: System.Reflection.AssemblyProductAttribute("FunAiGateway")]
 [assembly: System.Reflection.AssemblyTitleAttribute("FunAiGateway")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

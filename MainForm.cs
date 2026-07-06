@@ -26,20 +26,34 @@ namespace FunAiGateway
             btnEditChannel.Click += BtnEditChannel_Click;
             btnDeleteChannel.Click += BtnDeleteChannel_Click;
             btnToggleChannel.Click += BtnToggleChannel_Click;
+            tsmiDuplicateChannel.Click += TsmiDuplicateChannel_Click;
             btnStart.Click += BtnStart_Click;
             btnStop.Click += BtnStop_Click;
             btnSaveSettings.Click += BtnSaveSettings_Click;
             btnClearLogs.Click += BtnClearLogs_Click;
+            tsmiCopySelected.Click += TsmiCopySelected_Click;
+            tsmiCopyAll.Click += TsmiCopyAll_Click;
+            tsmiClearLogs.Click += TsmiClearLogs_Click;
+            // 右键日志列表时先选中右键所在的项，避免菜单操作作用于之前选中的项
+            lstLogOutput.MouseDown += LstLogOutput_MouseDown;
 
             // 密钥管理按钮事件
             btnAddKey.Click += BtnAddKey_Click;
             btnDeleteKey.Click += BtnDeleteKey_Click;
             btnEditKeyModels.Click += BtnEditKeyModels_Click;
-            // 双击密钥行进入编辑
-            dgvKeys.CellDoubleClick += (_, e) => { if (e.RowIndex >= 0) BtnEditKeyModels_Click(null, EventArgs.Empty); };
+            // 双击密钥行进入编辑：直接使用双击行的索引，避免 SelectedRows[0] 指向其它已选行而编辑到错误的 key
+            dgvKeys.CellDoubleClick += (_, e) =>
+            {
+                if (e.RowIndex >= 0)
+                {
+                    EditKeyByRowIndex(e.RowIndex);
+                }
+            };
 
             // 日志上限变化时保存并裁剪已有日志
             dgvChannels.DoubleClick += BtnEditChannel_Click;
+            // 右键时先选中右键所在的行，避免弹出菜单时仍是之前选中的行
+            dgvChannels.CellMouseDown += DgvChannels_CellMouseDown;
 
             // 日志表格颜色格式化
             dgvLogs.CellFormatting += DgvLogs_CellFormatting;
@@ -57,6 +71,7 @@ namespace FunAiGateway
             btnCopyOpenAI.Click += (_, _) => CopyToClipboard(txtOpenAIUrl.Text);
             btnCopyAnthropic.Click += (_, _) => CopyToClipboard(txtAnthropicUrl.Text);
             btnCopyModels.Click += (_, _) => CopyToClipboard(txtModelsUrl.Text);
+            btnCopyPortal.Click += (_, _) => CopyToClipboard(txtPortalUrl.Text);
 
             // 监听模式切换时保存并更新连接信息
             rdoLocal.ValueChanged += (_, _) => { AutoSaveSettings(); UpdateConnectionInfo(); };
@@ -155,6 +170,7 @@ namespace FunAiGateway
             txtOpenAIUrl.Text = $"http://{host}/v1/chat/completions";
             txtAnthropicUrl.Text = $"http://{host}/v1/messages";
             txtModelsUrl.Text = $"http://{host}/v1/models";
+            txtPortalUrl.Text = $"http://{host}/portal";
         }
 
         private void CopyToClipboard(string text)
@@ -259,6 +275,20 @@ namespace FunAiGateway
         // 刷新密钥列表
         private void RefreshKeys()
         {
+            RefreshKeys(false);
+        }
+
+        // preserveSelection：为 true 时保留当前选中行的 Key Id，刷新后重新选中同一行
+        // 用于请求完成时实时刷新剩余次数而不打断用户操作
+        private void RefreshKeys(bool preserveSelection)
+        {
+            // 记录当前选中的 Key Id，刷新后尝试重新选中
+            string? selectedKeyId = null;
+            if (preserveSelection && dgvKeys.SelectedRows.Count > 0)
+            {
+                selectedKeyId = dgvKeys.SelectedRows[0].Cells["Id"].Value?.ToString();
+            }
+
             var keys = _configService.Config.ApiKeys.Select(k => new
             {
                 k.Id,
@@ -274,6 +304,19 @@ namespace FunAiGateway
             dgvKeys.DataSource = keys;
             if (dgvKeys.Columns["Id"] != null)
                 dgvKeys.Columns["Id"]!.Visible = false;
+
+            // 恢复选中行
+            if (preserveSelection && selectedKeyId != null)
+            {
+                for (int i = 0; i < dgvKeys.Rows.Count; i++)
+                {
+                    if (dgvKeys.Rows[i].Cells["Id"].Value?.ToString() == selectedKeyId)
+                    {
+                        dgvKeys.Rows[i].Selected = true;
+                        return;
+                    }
+                }
+            }
             dgvKeys.ClearSelection();
         }
 
@@ -312,15 +355,36 @@ namespace FunAiGateway
             }
         }
 
-        // 编辑密钥的模型权限
+        // 编辑密钥的模型权限（按钮触发：使用当前选中行）
         private void BtnEditKeyModels_Click(object? sender, EventArgs e)
         {
-            if (dgvKeys.SelectedRows.Count == 0) return;
-            var id = dgvKeys.SelectedRows[0].Cells["Id"].Value?.ToString();
-            if (id == null) return;
+            if (dgvKeys.SelectedRows.Count == 0)
+            {
+                return;
+            }
+            // 按钮触发时使用当前选中行（用户主动点选的行）
+            EditKeyByRowIndex(dgvKeys.SelectedRows[0].Index);
+        }
+
+        // 通过 DataGridView 行索引定位密钥并打开编辑对话框
+        // 双击行直接传 e.RowIndex，避免依赖 SelectedRows[0]（多选/选择顺序问题导致编辑到其它 key）
+        private void EditKeyByRowIndex(int rowIndex)
+        {
+            if (rowIndex < 0 || rowIndex >= dgvKeys.Rows.Count)
+            {
+                return;
+            }
+            var id = dgvKeys.Rows[rowIndex].Cells["Id"].Value?.ToString();
+            if (id == null)
+            {
+                return;
+            }
 
             var apiKey = _configService.Config.ApiKeys.FirstOrDefault(k => k.Id == id);
-            if (apiKey == null) return;
+            if (apiKey == null)
+            {
+                return;
+            }
 
             using var dlg = new KeyEditDialog(apiKey, _configService.GetAllModelNames());
             if (dlg.ShowDialog(this) == DialogResult.OK)
@@ -397,6 +461,39 @@ namespace FunAiGateway
             RefreshChannels();
         }
 
+        private void DgvChannels_CellMouseDown(object? sender, DataGridViewCellMouseEventArgs e)
+        {
+            // 右键点击时把右键所在行设为选中行，确保后续菜单操作作用于该行
+            if (e.Button == MouseButtons.Right && e.RowIndex >= 0)
+            {
+                dgvChannels.ClearSelection();
+                dgvChannels.Rows[e.RowIndex].Selected = true;
+            }
+        }
+
+        private void TsmiDuplicateChannel_Click(object? sender, EventArgs e)
+        {
+            // 右键生成选中渠道的副本：深拷贝避免共享引用，生成新 Id，名称加“ 副本”后缀
+            if (dgvChannels.SelectedRows.Count == 0) { return; }
+            var id = dgvChannels.SelectedRows[0].Cells["Id"].Value?.ToString();
+            if (id == null) { return; }
+
+            var channel = _configService.Config.Channels.FirstOrDefault(c => c.Id == id);
+            if (channel == null) { return; }
+
+            // 使用 JSON 深拷贝，确保 Models 列表等引用类型独立
+            var json = Newtonsoft.Json.JsonConvert.SerializeObject(channel);
+            var copy = Newtonsoft.Json.JsonConvert.DeserializeObject<ChannelConfig>(json);
+            if (copy == null) { return; }
+
+            // 生成新 Id 与名称后缀，避免冲突
+            copy.Id = Guid.NewGuid().ToString();
+            copy.Name = $"{channel.Name} 副本";
+
+            _configService.AddChannel(copy);
+            RefreshChannels();
+        }
+
         private void DgvLogs_CellFormatting(object? sender, DataGridViewCellFormattingEventArgs e)
         {
             if (e.Value == null) return;
@@ -439,6 +536,15 @@ namespace FunAiGateway
             }
         }
 
+        // 根据 KeyId 反查 Key 名称用于日志展示
+        // 找不到时返回空字符串（如未鉴权通过的 404 请求、已被删除的 Key 等）
+        private string GetKeyNameById(string? keyId)
+        {
+            if (string.IsNullOrEmpty(keyId)) { return ""; }
+            var key = _configService.Config.ApiKeys.FirstOrDefault(k => k.Id == keyId);
+            return key?.Name ?? "";
+        }
+
         private void RefreshLogs()
         {
             // 窗体正在关闭或已释放时不再刷新
@@ -452,6 +558,7 @@ namespace FunAiGateway
                 dgvLogs.DataSource = logs.Select(l => new
                 {
                     时间 = l.Time.ToString("HH:mm:ss"),
+                    密钥 = GetKeyNameById(l.KeyId),
                     渠道 = l.ChannelName,
                     协议 = $"{l.RequestProtocol}→{l.TargetProtocol}",
                     输入Token = l.InputTokens,
@@ -469,6 +576,13 @@ namespace FunAiGateway
                 // 滚动到最后一行（最新记录）
                 if (dgvLogs.Rows.Count > 0)
                 {
+                    // 焦点在其它控件（如下方文本框）时，设置 FirstDisplayedScrollingRowIndex 会被忽略
+                    // 临时让 dgvLogs 获得焦点以确保滚动生效，滚动完成后将焦点还给原控件
+                    var focused = dgvLogs.Focused;
+                    if (!focused)
+                    {
+                        dgvLogs.Focus();
+                    }
                     dgvLogs.FirstDisplayedScrollingRowIndex = dgvLogs.Rows.Count - 1;
                 }
                 // 清除选中状态，避免出现焦点
@@ -485,6 +599,7 @@ namespace FunAiGateway
             try
             {
                 if (dgvLogs.Columns["时间"] != null) { dgvLogs.Columns["时间"]!.Width = 95; dgvLogs.Columns["时间"]!.AutoSizeMode = DataGridViewAutoSizeColumnMode.None; }
+                if (dgvLogs.Columns["密钥"] != null) { dgvLogs.Columns["密钥"]!.Width = 130; dgvLogs.Columns["密钥"]!.AutoSizeMode = DataGridViewAutoSizeColumnMode.None; }
                 if (dgvLogs.Columns["渠道"] != null) { dgvLogs.Columns["渠道"]!.Width = 215; dgvLogs.Columns["渠道"]!.AutoSizeMode = DataGridViewAutoSizeColumnMode.None; }
                 if (dgvLogs.Columns["协议"] != null) { dgvLogs.Columns["协议"]!.Width = 240; dgvLogs.Columns["协议"]!.AutoSizeMode = DataGridViewAutoSizeColumnMode.None; }
                 if (dgvLogs.Columns["输入Token"] != null) { dgvLogs.Columns["输入Token"]!.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill; }
@@ -554,6 +669,9 @@ namespace FunAiGateway
 
             // 无论当前在哪个标签页都刷新日志表格，切换回来时数据即是最新的
             RefreshLogs();
+
+            // 刷新 Key 列表的剩余次数（保留选中行，避免打断用户操作）
+            RefreshKeys(true);
         }
 
         private void OnServerLog(string message)
@@ -568,12 +686,54 @@ namespace FunAiGateway
 
         private void AppendLog(string message)
         {
-            if (txtLogOutput.Lines.Length > 500)
+            // 超过500条裁掉旧的，保持列表容量
+            if (lstLogOutput.Items.Count > 500)
             {
-                var lines = txtLogOutput.Lines.Skip(200).ToArray();
-                txtLogOutput.Lines = lines;
+                int removeCount = lstLogOutput.Items.Count - 200;
+                for (int i = 0; i < removeCount; i++)
+                {
+                    lstLogOutput.Items.RemoveAt(0);
+                }
             }
-            txtLogOutput.AppendText($"{message}{Environment.NewLine}");
+            lstLogOutput.Items.Add(message);
+            // 滚动到最新一行
+            lstLogOutput.TopIndex = lstLogOutput.Items.Count - 1;
+        }
+
+        private void LstLogOutput_MouseDown(object? sender, MouseEventArgs e)
+        {
+            // 右键时把右键所在的项设为选中，确保菜单操作作用于该行
+            if (e.Button == MouseButtons.Right)
+            {
+                int index = lstLogOutput.IndexFromPoint(e.Location);
+                if (index >= 0 && index < lstLogOutput.Items.Count)
+                {
+                    lstLogOutput.SelectedIndex = index;
+                }
+            }
+        }
+
+        private void TsmiCopySelected_Click(object? sender, EventArgs e)
+        {
+            if (lstLogOutput.SelectedItem == null) { return; }
+            Clipboard.SetText(lstLogOutput.SelectedItem.ToString() ?? string.Empty);
+        }
+
+        private void TsmiCopyAll_Click(object? sender, EventArgs e)
+        {
+            if (lstLogOutput.Items.Count == 0) { return; }
+            var sb = new System.Text.StringBuilder();
+            foreach (var item in lstLogOutput.Items)
+            {
+                sb.AppendLine(item?.ToString() ?? string.Empty);
+            }
+            Clipboard.SetText(sb.ToString());
+        }
+
+        private void TsmiClearLogs_Click(object? sender, EventArgs e)
+        {
+            // 仅清空运行日志列表（不影响已写入文件的日志）
+            lstLogOutput.Items.Clear();
         }
 
         private void MainForm_FormClosing(object? sender, FormClosingEventArgs e)

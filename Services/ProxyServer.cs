@@ -685,7 +685,7 @@ namespace FunAiGateway.Services
         // OpenAI -> OpenAI 直接转发
         private async Task ForwardOpenAIAsync(HttpListenerContext context, ChannelConfig channel, JObject reqBody, bool isStream, RequestLog requestLog, CancellationToken ct)
         {
-            var url = $"{channel.OpenAIBaseUrl.TrimEnd('/')}/chat/completions";
+            var url = $"{EnsureApiVersionPath(channel.OpenAIBaseUrl)}/chat/completions";
             await ForwardRequestAsync(context, url, channel, reqBody, isStream, requestLog, ct, null, channel.OpenAIApiKey);
         }
 
@@ -693,7 +693,7 @@ namespace FunAiGateway.Services
         private async Task ForwardOpenAIToAnthropicAsync(HttpListenerContext context, ChannelConfig channel, JObject openaiReq, bool isStream, RequestLog requestLog, CancellationToken ct)
         {
             var (anthropicReq, _) = ProtocolConverter.OpenAIToAnthropic(openaiReq);
-            var url = $"{channel.AnthropicBaseUrl.TrimEnd('/')}/messages";
+            var url = $"{EnsureApiVersionPath(channel.AnthropicBaseUrl)}/messages";
 
             if (isStream)
             {
@@ -717,7 +717,7 @@ namespace FunAiGateway.Services
         // Anthropic -> Anthropic 直接转发
         private async Task ForwardAnthropicAsync(HttpListenerContext context, ChannelConfig channel, JObject reqBody, bool isStream, RequestLog requestLog, CancellationToken ct)
         {
-            var url = $"{channel.AnthropicBaseUrl.TrimEnd('/')}/messages";
+            var url = $"{EnsureApiVersionPath(channel.AnthropicBaseUrl)}/messages";
             await ForwardAnthropicRequestAsync(context, url, channel, reqBody, isStream, requestLog, ct);
         }
 
@@ -726,7 +726,7 @@ namespace FunAiGateway.Services
         {
             // 将Anthropic请求转为OpenAI请求
             var openaiReq = AnthropicToOpenAIRequest(anthropicReq);
-            var url = $"{channel.OpenAIBaseUrl.TrimEnd('/')}/chat/completions";
+            var url = $"{EnsureApiVersionPath(channel.OpenAIBaseUrl)}/chat/completions";
 
             if (isStream)
             {
@@ -2116,6 +2116,17 @@ document.getElementById('keyInput').addEventListener('keypress',function(e){if(e
                 }
             }
             catch { }
+        }
+
+        // 自动补全 API 版本路径：如果 BaseUrl 末尾未包含 /v1、/v2 等版本号，自动补 /v1
+        // 例如 https://api.anthropic.com → https://api.anthropic.com/v1
+        //      https://api.openai.com/v1 → 保持不变（已含版本号）
+        private static string EnsureApiVersionPath(string baseUrl)
+        {
+            var trimmed = baseUrl.TrimEnd('/');
+            if (System.Text.RegularExpressions.Regex.IsMatch(trimmed, @"/v\d+$"))
+                return trimmed;
+            return trimmed + "/v1";
         }
 
         // 判断 HTTP 状态码是否为可重试的临时性错误

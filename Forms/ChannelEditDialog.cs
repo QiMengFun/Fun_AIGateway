@@ -543,7 +543,7 @@ namespace FunAiGateway.Forms
             txtOpenAIBaseUrl.Size = new Size(380, 29);
             txtOpenAIBaseUrl.TabIndex = 1;
             txtOpenAIBaseUrl.TextAlignment = ContentAlignment.MiddleLeft;
-            txtOpenAIBaseUrl.Watermark = "如 https://api.openai.com/v1";
+            txtOpenAIBaseUrl.Watermark = "如 https://api.openai.com（自动补/v1）";
             // 
             // lblOpenAIApiKey
             // 
@@ -608,7 +608,7 @@ namespace FunAiGateway.Forms
             txtAnthropicBaseUrl.Size = new Size(380, 29);
             txtAnthropicBaseUrl.TabIndex = 1;
             txtAnthropicBaseUrl.TextAlignment = ContentAlignment.MiddleLeft;
-            txtAnthropicBaseUrl.Watermark = "如 https://api.anthropic.com";
+            txtAnthropicBaseUrl.Watermark = "如 https://api.anthropic.com（自动补/v1）";
             // 
             // lblAnthropicApiKey
             // 

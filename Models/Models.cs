@@ -10,6 +10,7 @@ namespace FunAiGateway.Models
         public string CustomHeaders { get; set; } = ""; // 自定义请求头 JSON格式
         public int Timeout { get; set; } = 300; // 超时秒数
         public int RetryCount { get; set; } = 0;
+        public double RetryDelay { get; set; } = 5; // 自动重试间隔秒数（支持小数，如 0.5 表示 500ms）
         // 代理设置（用于访问国外模型）
         public bool ProxyEnabled { get; set; } = false;        // 是否启用代理
         public string ProxyType { get; set; } = "HTTP";        // 代理方法/协议 HTTP / SOCKS5
@@ -24,6 +25,7 @@ namespace FunAiGateway.Models
         // Anthropic 协议端点（可单独配置，留空表示该渠道不提供 Anthropic 协议接入）
         public string AnthropicBaseUrl { get; set; } = "";
         public string AnthropicApiKey { get; set; } = "";
+        public string ReasoningEffort { get; set; } = "";    // 思考强度：空=不注入，可选 max/high/medium/low/none
 
         // 兼容旧配置：Type 字段保留用于反序列化旧 config.json，不再用于路由
         public ChannelType Type { get; set; } = ChannelType.OpenAI;
@@ -66,6 +68,7 @@ namespace FunAiGateway.Models
         public bool SupportStream { get; set; } = true;     // 是否支持流式
         public bool SupportVision { get; set; } = false;    // 是否支持视觉
         public bool SupportFunctionCalling { get; set; } = true; // 是否支持函数调用
+        public bool EnableThinking { get; set; } = false;   // 是否启用思考推理（注入 enable_thinking:true）
     }
 
     // 请求日志

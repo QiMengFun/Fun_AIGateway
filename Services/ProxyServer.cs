@@ -515,6 +515,15 @@ namespace FunAiGateway.Services
             // 推理模型处理：max_tokens → max_completion_tokens，并确保值足够大
             ApplyReasoningModelTokens(reqBody, !string.IsNullOrWhiteSpace(model.RealModelName) ? model.RealModelName : model.ModelName);
 
+            // 启用思考推理：模型配置勾选「启用思考」时注入 enable_thinking:true
+            if (model.EnableThinking)
+                reqBody["enable_thinking"] = true;
+
+            // 思考强度：用户未传 reasoning_effort 时，使用渠道配置的默认值
+            var effort = channel.ReasoningEffort;
+            if (!string.IsNullOrEmpty(effort) && reqBody["reasoning_effort"] == null)
+                reqBody["reasoning_effort"] = effort;
+
             // 自动识别协议链路：根据渠道配置的可用端点决定转发路径
             // 1. 优先同协议直连（请求OpenAI→渠道有OpenAI端点则直连，避免协议转换开销）
             // 2. 否则用另一协议端点并做协议转换
@@ -640,6 +649,15 @@ namespace FunAiGateway.Services
 
             if (!string.IsNullOrEmpty(model!.RealModelName))
                 reqBody["model"] = model.RealModelName;
+
+            // 启用思考推理：模型配置勾选「启用思考」时注入 enable_thinking:true
+            if (model.EnableThinking)
+                reqBody["enable_thinking"] = true;
+
+            // 思考强度：用户未传 reasoning_effort 时，使用渠道配置的默认值
+            var effort = channel.ReasoningEffort;
+            if (!string.IsNullOrEmpty(effort) && reqBody["reasoning_effort"] == null)
+                reqBody["reasoning_effort"] = effort;
 
             // 自动识别协议链路：优先同协议直连
             var endpoints = ConfigService.GetChannelEndpoints(channel);
@@ -1083,8 +1101,8 @@ namespace FunAiGateway.Services
             {
                 if (attempt > 1)
                 {
-                    Log($"渠道 [{channel.Name}] 流式响应含错误，5 秒后进行第 {attempt - 1}/{channel.RetryCount} 次重试");
-                    try { await Task.Delay(TimeSpan.FromSeconds(5), ct); }
+                    Log($"渠道 [{channel.Name}] 流式响应含错误，{channel.RetryDelay} 秒后进行第 {attempt - 1}/{channel.RetryCount} 次重试");
+                    try { await Task.Delay(TimeSpan.FromSeconds(channel.RetryDelay), ct); }
                     catch (OperationCanceledException) { throw; }
                 }
 
@@ -1245,8 +1263,8 @@ namespace FunAiGateway.Services
                 retryAttempt++;
                 if (retryAttempt > maxAttempts) break;
 
-                Log($"渠道 [{channel.Name}] 5 秒后进行第 {retryAttempt - 1}/{channel.RetryCount} 次重试");
-                try { await Task.Delay(TimeSpan.FromSeconds(5), ct); }
+                Log($"渠道 [{channel.Name}] {channel.RetryDelay} 秒后进行第 {retryAttempt - 1}/{channel.RetryCount} 次重试");
+                try { await Task.Delay(TimeSpan.FromSeconds(channel.RetryDelay), ct); }
                 catch (OperationCanceledException) { throw; }
 
                 // 重新发请求（这里跳出后需要重新读取流，简化处理：直接 break 让外层无法重试，
@@ -2163,11 +2181,11 @@ document.getElementById('keyInput').addEventListener('keypress',function(e){if(e
 
             for (int attempt = 1; attempt <= maxAttempts; attempt++)
             {
-                // 首次不延迟；后续重试前固定延迟 5 秒
+                // 首次不延迟；后续重试前按渠道配置的 RetryDelay 秒数延迟
                 if (attempt > 1)
                 {
-                    Log($"渠道 [{channel.Name}] 流式响应含错误，5 秒后进行第 {attempt - 1}/{channel.RetryCount} 次重试");
-                    try { await Task.Delay(TimeSpan.FromSeconds(5), ct); }
+                    Log($"渠道 [{channel.Name}] 流式响应含错误，{channel.RetryDelay} 秒后进行第 {attempt - 1}/{channel.RetryCount} 次重试");
+                    try { await Task.Delay(TimeSpan.FromSeconds(channel.RetryDelay), ct); }
                     catch (OperationCanceledException) { throw; }
                 }
 
@@ -2342,8 +2360,7 @@ document.getElementById('keyInput').addEventListener('keypress',function(e){if(e
             reqBody.Remove("frequency_penalty");
             reqBody.Remove("presence_penalty");
 
-            // 注：reasoning_effort 不主动注入，因为部分上游渠道不支持该参数或对值敏感
-            // 仅在客户端已传时保留原值
+            // reasoning_effort 由全局配置注入（用户未传时），此处保留原值或已注入值
 
             // 确保流式请求返回 usage 信息（推理模型依赖 usage 统计）
             if (reqBody["stream"]?.Value<bool>() == true)
@@ -2355,7 +2372,7 @@ document.getElementById('keyInput').addEventListener('keypress',function(e){if(e
             }
         }
 
-        // 带自动重试的请求发送：当上游返回 429/500/502/503 或网络异常时，延迟 5 秒后重试
+        // 带自动重试的请求发送：当上游返回 429/500/502/503 或网络异常时，按渠道配置的延迟秒数后重试
         // createRequest：每次尝试时调用以创建新的 HttpRequestMessage（请求实例不可重用）
         // streamResponse：是否以流式方式读取响应（ResponseHeadersRead）
         // linkedCt：已绑定渠道超时的 CancellationToken
@@ -2372,13 +2389,13 @@ document.getElementById('keyInput').addEventListener('keypress',function(e){if(e
 
             for (int attempt = 1; attempt <= maxAttempts; attempt++)
             {
-                // 首次不延迟；后续重试前固定延迟 5 秒
+                // 首次不延迟；后续重试前按渠道配置的 RetryDelay 秒数延迟
                 if (attempt > 1)
                 {
-                    Log($"渠道 [{channel.Name}] 5 秒后进行第 {attempt - 1}/{channel.RetryCount} 次自动重试");
+                    Log($"渠道 [{channel.Name}] {channel.RetryDelay} 秒后进行第 {attempt - 1}/{channel.RetryCount} 次自动重试");
                     try
                     {
-                        await Task.Delay(TimeSpan.FromSeconds(5), linkedCt);
+                        await Task.Delay(TimeSpan.FromSeconds(channel.RetryDelay), linkedCt);
                     }
                     catch (OperationCanceledException) { throw; }
                 }

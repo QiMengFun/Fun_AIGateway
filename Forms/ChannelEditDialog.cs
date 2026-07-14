@@ -23,12 +23,17 @@ namespace FunAiGateway.Forms
         private System.Windows.Forms.NumericUpDown numTimeout;
         private UILabel lblRetryCount;
         private System.Windows.Forms.NumericUpDown numRetryCount;
+        private UILabel lblRetryDelay;
+        private System.Windows.Forms.NumericUpDown numRetryDelay;
         private UICheckBox chkEnabled;
         private UILabel lblCustomHeaders;
         private UITextBox txtCustomHeaders;
         private UICheckBox chkSupportStream;
         private UICheckBox chkSupportVision;
         private UICheckBox chkSupportFunctionCalling;
+        private UICheckBox chkEnableThinking;
+        private UILabel lblReasoningEffort;
+        private UIComboBox cmbReasoningEffort;
         // OpenAI 协议端点控件
         private UIGroupBox grpOpenAI;
         private UILabel lblOpenAIBaseUrl;
@@ -73,6 +78,7 @@ namespace FunAiGateway.Forms
                 txtAnthropicApiKey.Text = existing.AnthropicApiKey;
                 numTimeout.Value = existing.Timeout;
                 numRetryCount.Value = existing.RetryCount;
+                numRetryDelay.Value = (decimal)existing.RetryDelay;
                 chkEnabled.Checked = existing.Enabled;
                 txtCustomHeaders.Text = existing.CustomHeaders;
                 // 代理设置
@@ -91,12 +97,16 @@ namespace FunAiGateway.Forms
                     chkSupportStream.Checked = model.SupportStream;
                     chkSupportVision.Checked = model.SupportVision;
                     chkSupportFunctionCalling.Checked = model.SupportFunctionCalling;
+                    chkEnableThinking.Checked = model.EnableThinking;
                 }
+                // 思考强度
+                cmbReasoningEffort.SelectedItem = !string.IsNullOrEmpty(existing.ReasoningEffort) ? existing.ReasoningEffort : "默认";
                 Text = "编辑渠道";
             }
             else
             {
                 cmbProxyType.SelectedIndex = 0;
+                cmbReasoningEffort.SelectedIndex = 0; // "默认"
                 Text = "添加渠道";
             }
         }
@@ -147,6 +157,7 @@ namespace FunAiGateway.Forms
                 // 旧字段 BaseUrl/ApiKey 留空（不再使用）
                 Timeout = (int)numTimeout.Value,
                 RetryCount = (int)numRetryCount.Value,
+                RetryDelay = (double)numRetryDelay.Value,
                 Enabled = chkEnabled.Checked,
                 CustomHeaders = txtCustomHeaders.Text.Trim(),
                 // 代理设置
@@ -155,6 +166,7 @@ namespace FunAiGateway.Forms
                 ProxyHost = txtProxyHost.Text.Trim(),
                 ProxyUsername = txtProxyUsername.Text.Trim(),
                 ProxyPassword = txtProxyPassword.Text.Trim(),
+                ReasoningEffort = (cmbReasoningEffort.SelectedItem?.ToString() is "默认" or null) ? "" : cmbReasoningEffort.SelectedItem!.ToString()!,
                 Models = new List<ModelConfig>
                 {
                     new()
@@ -165,7 +177,8 @@ namespace FunAiGateway.Forms
                         MaxOutputTokens = (int)numMaxOutputTokens.Value,
                         SupportStream = chkSupportStream.Checked,
                         SupportVision = chkSupportVision.Checked,
-                        SupportFunctionCalling = chkSupportFunctionCalling.Checked
+                        SupportFunctionCalling = chkSupportFunctionCalling.Checked,
+                        EnableThinking = chkEnableThinking.Checked
                     }
                 }
             };
@@ -189,12 +202,17 @@ namespace FunAiGateway.Forms
             numTimeout = new NumericUpDown();
             lblRetryCount = new UILabel();
             numRetryCount = new NumericUpDown();
+            lblRetryDelay = new UILabel();
+            numRetryDelay = new NumericUpDown();
             chkEnabled = new UICheckBox();
             lblCustomHeaders = new UILabel();
             txtCustomHeaders = new UITextBox();
             chkSupportStream = new UICheckBox();
             chkSupportVision = new UICheckBox();
             chkSupportFunctionCalling = new UICheckBox();
+            chkEnableThinking = new UICheckBox();
+            lblReasoningEffort = new UILabel();
+            cmbReasoningEffort = new UIComboBox();
             grpOpenAI = new UIGroupBox();
             lblOpenAIBaseUrl = new UILabel();
             txtOpenAIBaseUrl = new UITextBox();
@@ -221,6 +239,7 @@ namespace FunAiGateway.Forms
             ((System.ComponentModel.ISupportInitialize)numMaxOutputTokens).BeginInit();
             ((System.ComponentModel.ISupportInitialize)numTimeout).BeginInit();
             ((System.ComponentModel.ISupportInitialize)numRetryCount).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)numRetryDelay).BeginInit();
             grpOpenAI.SuspendLayout();
             grpAnthropic.SuspendLayout();
             uiGroupBox1.SuspendLayout();
@@ -278,7 +297,7 @@ namespace FunAiGateway.Forms
             // 
             lblContextLength.Font = new Font("宋体", 11F);
             lblContextLength.ForeColor = Color.FromArgb(48, 48, 48);
-            lblContextLength.Location = new Point(20, 137);
+            lblContextLength.Location = new Point(500, 53);
             lblContextLength.Name = "lblContextLength";
             lblContextLength.Size = new Size(94, 23);
             lblContextLength.TabIndex = 4;
@@ -286,7 +305,7 @@ namespace FunAiGateway.Forms
             // 
             // numContextLength
             // 
-            numContextLength.Location = new Point(120, 134);
+            numContextLength.Location = new Point(600, 50);
             numContextLength.Maximum = new decimal(new int[] { 2000000, 0, 0, 0 });
             numContextLength.Name = "numContextLength";
             numContextLength.Size = new Size(100, 26);
@@ -297,7 +316,7 @@ namespace FunAiGateway.Forms
             // 
             lblMaxOutputTokens.Font = new Font("宋体", 11F);
             lblMaxOutputTokens.ForeColor = Color.FromArgb(48, 48, 48);
-            lblMaxOutputTokens.Location = new Point(253, 137);
+            lblMaxOutputTokens.Location = new Point(733, 53);
             lblMaxOutputTokens.Name = "lblMaxOutputTokens";
             lblMaxOutputTokens.Size = new Size(87, 23);
             lblMaxOutputTokens.TabIndex = 6;
@@ -305,7 +324,7 @@ namespace FunAiGateway.Forms
             // 
             // numMaxOutputTokens
             // 
-            numMaxOutputTokens.Location = new Point(346, 134);
+            numMaxOutputTokens.Location = new Point(826, 50);
             numMaxOutputTokens.Maximum = new decimal(new int[] { 2000000, 0, 0, 0 });
             numMaxOutputTokens.Name = "numMaxOutputTokens";
             numMaxOutputTokens.Size = new Size(100, 26);
@@ -316,15 +335,15 @@ namespace FunAiGateway.Forms
             // 
             lblTimeout.Font = new Font("宋体", 11F);
             lblTimeout.ForeColor = Color.FromArgb(48, 48, 48);
-            lblTimeout.Location = new Point(22, 182);
+            lblTimeout.Location = new Point(500, 93);
             lblTimeout.Name = "lblTimeout";
-            lblTimeout.Size = new Size(90, 23);
+            lblTimeout.Size = new Size(77, 23);
             lblTimeout.TabIndex = 8;
             lblTimeout.Text = "超时(秒):";
             // 
             // numTimeout
             // 
-            numTimeout.Location = new Point(120, 179);
+            numTimeout.Location = new Point(585, 90);
             numTimeout.Maximum = new decimal(new int[] { 600, 0, 0, 0 });
             numTimeout.Name = "numTimeout";
             numTimeout.Size = new Size(80, 26);
@@ -335,38 +354,59 @@ namespace FunAiGateway.Forms
             // 
             lblRetryCount.Font = new Font("宋体", 11F);
             lblRetryCount.ForeColor = Color.FromArgb(48, 48, 48);
-            lblRetryCount.Location = new Point(220, 182);
+            lblRetryCount.Location = new Point(675, 93);
             lblRetryCount.Name = "lblRetryCount";
-            lblRetryCount.Size = new Size(82, 23);
+            lblRetryCount.Size = new Size(70, 23);
             lblRetryCount.TabIndex = 10;
             lblRetryCount.Text = "重试次数:";
             // 
             // numRetryCount
             // 
-            numRetryCount.Location = new Point(308, 179);
-            // 重试次数最大值：不限制上限（int.MaxValue）
+            numRetryCount.Location = new Point(751, 90);
             numRetryCount.Maximum = new decimal(new int[] { int.MaxValue, 0, 0, 0 });
             numRetryCount.Name = "numRetryCount";
-            numRetryCount.Size = new Size(80, 26);
+            numRetryCount.Size = new Size(60, 26);
             numRetryCount.TabIndex = 11;
+            //
+            // lblRetryDelay
+            //
+            lblRetryDelay.Font = new Font("宋体", 11F);
+            lblRetryDelay.ForeColor = Color.FromArgb(48, 48, 48);
+            lblRetryDelay.Location = new Point(817, 93);
+            lblRetryDelay.Name = "lblRetryDelay";
+            lblRetryDelay.Size = new Size(77, 23);
+            lblRetryDelay.TabIndex = 12;
+            lblRetryDelay.Text = "延迟(秒):";
+            //
+            // numRetryDelay
+            //
+            numRetryDelay.DecimalPlaces = 1;
+            numRetryDelay.Increment = 0.5m; // 每次增减 0.5 秒
+            numRetryDelay.Location = new Point(898, 90);
+            numRetryDelay.Maximum = new decimal(new int[] { 360, 0, 0, 0 });
+            numRetryDelay.Minimum = new decimal(new int[] { 0, 0, 0, 0 });
+            numRetryDelay.Name = "numRetryDelay";
+            numRetryDelay.Size = new Size(65, 26);
+            numRetryDelay.TabIndex = 13;
+            numRetryDelay.Value = new decimal(new int[] { 5, 0, 0, 0 });
             // 
             // chkEnabled
             // 
             chkEnabled.Checked = true;
             chkEnabled.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
             chkEnabled.ForeColor = Color.FromArgb(48, 48, 48);
-            chkEnabled.Location = new Point(400, 179);
+            chkEnabled.Location = new Point(889, 131);
             chkEnabled.MinimumSize = new Size(1, 1);
             chkEnabled.Name = "chkEnabled";
             chkEnabled.Size = new Size(80, 29);
-            chkEnabled.TabIndex = 12;
+            chkEnabled.TabIndex = 14;
             chkEnabled.Text = "启用";
             // 
             // lblCustomHeaders
             // 
             lblCustomHeaders.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
             lblCustomHeaders.ForeColor = Color.FromArgb(48, 48, 48);
-            lblCustomHeaders.Location = new Point(20, 267);
+            lblCustomHeaders.Location = new Point(20, 137);
             lblCustomHeaders.Name = "lblCustomHeaders";
             lblCustomHeaders.Size = new Size(90, 23);
             lblCustomHeaders.TabIndex = 16;
@@ -375,7 +415,7 @@ namespace FunAiGateway.Forms
             // txtCustomHeaders
             // 
             txtCustomHeaders.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
-            txtCustomHeaders.Location = new Point(120, 264);
+            txtCustomHeaders.Location = new Point(120, 134);
             txtCustomHeaders.Margin = new Padding(4, 5, 4, 5);
             txtCustomHeaders.MinimumSize = new Size(1, 16);
             txtCustomHeaders.Multiline = true;
@@ -392,7 +432,7 @@ namespace FunAiGateway.Forms
             chkSupportStream.Checked = true;
             chkSupportStream.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
             chkSupportStream.ForeColor = Color.FromArgb(48, 48, 48);
-            chkSupportStream.Location = new Point(20, 225);
+            chkSupportStream.Location = new Point(504, 131);
             chkSupportStream.MinimumSize = new Size(1, 1);
             chkSupportStream.Name = "chkSupportStream";
             chkSupportStream.Size = new Size(90, 29);
@@ -403,7 +443,7 @@ namespace FunAiGateway.Forms
             // 
             chkSupportVision.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
             chkSupportVision.ForeColor = Color.FromArgb(48, 48, 48);
-            chkSupportVision.Location = new Point(120, 225);
+            chkSupportVision.Location = new Point(604, 131);
             chkSupportVision.MinimumSize = new Size(1, 1);
             chkSupportVision.Name = "chkSupportVision";
             chkSupportVision.Size = new Size(90, 29);
@@ -415,12 +455,54 @@ namespace FunAiGateway.Forms
             chkSupportFunctionCalling.Checked = true;
             chkSupportFunctionCalling.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
             chkSupportFunctionCalling.ForeColor = Color.FromArgb(48, 48, 48);
-            chkSupportFunctionCalling.Location = new Point(220, 225);
+            chkSupportFunctionCalling.Location = new Point(704, 131);
             chkSupportFunctionCalling.MinimumSize = new Size(1, 1);
             chkSupportFunctionCalling.Name = "chkSupportFunctionCalling";
             chkSupportFunctionCalling.Size = new Size(120, 29);
             chkSupportFunctionCalling.TabIndex = 15;
             chkSupportFunctionCalling.Text = "支持函数调用";
+            // 
+            // chkEnableThinking
+            // 
+            chkEnableThinking.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
+            chkEnableThinking.ForeColor = Color.FromArgb(48, 48, 48);
+            chkEnableThinking.Location = new Point(504, 176);
+            chkEnableThinking.MinimumSize = new Size(1, 1);
+            chkEnableThinking.Name = "chkEnableThinking";
+            chkEnableThinking.Size = new Size(109, 29);
+            chkEnableThinking.TabIndex = 16;
+            chkEnableThinking.Text = "启用思考";
+            // 
+            // lblReasoningEffort
+            // 
+            lblReasoningEffort.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
+            lblReasoningEffort.ForeColor = Color.FromArgb(48, 48, 48);
+            lblReasoningEffort.Location = new Point(619, 179);
+            lblReasoningEffort.Name = "lblReasoningEffort";
+            lblReasoningEffort.Size = new Size(80, 23);
+            lblReasoningEffort.TabIndex = 18;
+            lblReasoningEffort.Text = "思考强度:";
+            lblReasoningEffort.TextAlign = ContentAlignment.MiddleCenter;
+            // 
+            // cmbReasoningEffort
+            // 
+            cmbReasoningEffort.DataSource = null;
+            cmbReasoningEffort.DropDownStyle = UIDropDownStyle.DropDownList;
+            cmbReasoningEffort.FillColor = Color.White;
+            cmbReasoningEffort.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
+            cmbReasoningEffort.ItemHoverColor = Color.FromArgb(155, 200, 255);
+            cmbReasoningEffort.Items.AddRange(new object[] { "默认", "max", "high", "medium", "low", "none" });
+            cmbReasoningEffort.ItemSelectForeColor = Color.FromArgb(235, 243, 255);
+            cmbReasoningEffort.Location = new Point(720, 176);
+            cmbReasoningEffort.Margin = new Padding(4, 5, 4, 5);
+            cmbReasoningEffort.MinimumSize = new Size(63, 0);
+            cmbReasoningEffort.Name = "cmbReasoningEffort";
+            cmbReasoningEffort.Padding = new Padding(0, 0, 30, 2);
+            cmbReasoningEffort.Size = new Size(100, 29);
+            cmbReasoningEffort.SymbolSize = 24;
+            cmbReasoningEffort.TabIndex = 19;
+            cmbReasoningEffort.TextAlignment = ContentAlignment.MiddleLeft;
+            cmbReasoningEffort.Watermark = "默认";
             // 
             // grpOpenAI
             // 
@@ -429,12 +511,12 @@ namespace FunAiGateway.Forms
             grpOpenAI.Controls.Add(lblOpenAIApiKey);
             grpOpenAI.Controls.Add(txtOpenAIApiKey);
             grpOpenAI.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
-            grpOpenAI.Location = new Point(4, 332);
+            grpOpenAI.Location = new Point(4, 222);
             grpOpenAI.Margin = new Padding(4, 5, 4, 5);
             grpOpenAI.MinimumSize = new Size(1, 1);
             grpOpenAI.Name = "grpOpenAI";
             grpOpenAI.Padding = new Padding(0, 32, 0, 0);
-            grpOpenAI.Size = new Size(486, 110);
+            grpOpenAI.Size = new Size(476, 110);
             grpOpenAI.TabIndex = 18;
             grpOpenAI.Text = "OpenAI 协议";
             grpOpenAI.TextAlignment = ContentAlignment.MiddleLeft;
@@ -494,12 +576,12 @@ namespace FunAiGateway.Forms
             grpAnthropic.Controls.Add(lblAnthropicApiKey);
             grpAnthropic.Controls.Add(txtAnthropicApiKey);
             grpAnthropic.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
-            grpAnthropic.Location = new Point(4, 447);
+            grpAnthropic.Location = new Point(486, 222);
             grpAnthropic.Margin = new Padding(4, 5, 4, 5);
             grpAnthropic.MinimumSize = new Size(1, 1);
             grpAnthropic.Name = "grpAnthropic";
             grpAnthropic.Padding = new Padding(0, 32, 0, 0);
-            grpAnthropic.Size = new Size(486, 110);
+            grpAnthropic.Size = new Size(475, 110);
             grpAnthropic.TabIndex = 19;
             grpAnthropic.Text = "Anthropic 协议";
             grpAnthropic.TextAlignment = ContentAlignment.MiddleLeft;
@@ -669,7 +751,7 @@ namespace FunAiGateway.Forms
             // btnOK
             // 
             btnOK.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
-            btnOK.Location = new Point(133, 805);
+            btnOK.Location = new Point(372, 587);
             btnOK.MinimumSize = new Size(1, 1);
             btnOK.Name = "btnOK";
             btnOK.Size = new Size(100, 35);
@@ -680,7 +762,7 @@ namespace FunAiGateway.Forms
             // btnCancel
             // 
             btnCancel.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
-            btnCancel.Location = new Point(253, 805);
+            btnCancel.Location = new Point(492, 587);
             btnCancel.MinimumSize = new Size(1, 1);
             btnCancel.Name = "btnCancel";
             btnCancel.Size = new Size(100, 35);
@@ -700,12 +782,12 @@ namespace FunAiGateway.Forms
             uiGroupBox1.Controls.Add(cmbProxyType);
             uiGroupBox1.Controls.Add(lblProxyType);
             uiGroupBox1.Font = new Font("宋体", 12F, FontStyle.Regular, GraphicsUnit.Point, 134);
-            uiGroupBox1.Location = new Point(4, 565);
+            uiGroupBox1.Location = new Point(4, 342);
             uiGroupBox1.Margin = new Padding(4, 5, 4, 5);
             uiGroupBox1.MinimumSize = new Size(1, 1);
             uiGroupBox1.Name = "uiGroupBox1";
             uiGroupBox1.Padding = new Padding(0, 32, 0, 0);
-            uiGroupBox1.Size = new Size(486, 225);
+            uiGroupBox1.Size = new Size(476, 225);
             uiGroupBox1.TabIndex = 35;
             uiGroupBox1.Text = "代理";
             uiGroupBox1.TextAlignment = ContentAlignment.MiddleLeft;
@@ -715,7 +797,7 @@ namespace FunAiGateway.Forms
             AcceptButton = btnOK;
             AutoScaleMode = AutoScaleMode.None;
             CancelButton = btnCancel;
-            ClientSize = new Size(494, 852);
+            ClientSize = new Size(969, 641);
             Controls.Add(uiGroupBox1);
             Controls.Add(grpOpenAI);
             Controls.Add(grpAnthropic);
@@ -731,10 +813,15 @@ namespace FunAiGateway.Forms
             Controls.Add(numTimeout);
             Controls.Add(lblRetryCount);
             Controls.Add(numRetryCount);
+            Controls.Add(lblRetryDelay);
+            Controls.Add(numRetryDelay);
             Controls.Add(chkEnabled);
             Controls.Add(chkSupportStream);
             Controls.Add(chkSupportVision);
             Controls.Add(chkSupportFunctionCalling);
+            Controls.Add(chkEnableThinking);
+            Controls.Add(lblReasoningEffort);
+            Controls.Add(cmbReasoningEffort);
             Controls.Add(lblCustomHeaders);
             Controls.Add(txtCustomHeaders);
             Controls.Add(btnOK);
@@ -750,6 +837,7 @@ namespace FunAiGateway.Forms
             ((System.ComponentModel.ISupportInitialize)numMaxOutputTokens).EndInit();
             ((System.ComponentModel.ISupportInitialize)numTimeout).EndInit();
             ((System.ComponentModel.ISupportInitialize)numRetryCount).EndInit();
+            ((System.ComponentModel.ISupportInitialize)numRetryDelay).EndInit();
             grpOpenAI.ResumeLayout(false);
             grpAnthropic.ResumeLayout(false);
             uiGroupBox1.ResumeLayout(false);

@@ -54,7 +54,6 @@ namespace FunAiGateway.Services
                 bool changed = false;
                 foreach (var channel in _config.Channels)
                 {
-                    // 旧配置有 BaseUrl 但新字段为空，迁移
                     if (!string.IsNullOrEmpty(channel.BaseUrl))
                     {
                         if (channel.Type == ChannelType.Anthropic)

@@ -650,9 +650,18 @@ namespace FunAiGateway.Services
             if (!string.IsNullOrEmpty(model!.RealModelName))
                 reqBody["model"] = model.RealModelName;
 
-            // 启用思考推理：模型配置勾选「启用思考」时注入 enable_thinking:true
-            if (model.EnableThinking)
-                reqBody["enable_thinking"] = true;
+            // 启用思考推理：Anthropic协议使用 thinking 字段，强行注入/替换以启用扩展思考
+            // 触发条件：模型配置勾选「启用思考」 或 用户请求中传入 enable_thinking:true
+            if (model.EnableThinking || reqBody["enable_thinking"]?.Value<bool>() == true)
+            {
+                reqBody["thinking"] = new JObject
+                {
+                    ["type"] = "enabled",
+                    ["budget_tokens"] = 8192
+                };
+            }
+            // Anthropic不识别 enable_thinking，移除避免上游报错
+            reqBody.Remove("enable_thinking");
 
             // 思考强度：用户未传 reasoning_effort 时，使用渠道配置的默认值
             var effort = channel.ReasoningEffort;
@@ -903,7 +912,9 @@ namespace FunAiGateway.Services
         // endpointApiKey：该协议端点对应的 ApiKey（来自渠道的 OpenAIApiKey/AnthropicApiKey）
         private async Task ForwardRequestAsync(HttpListenerContext context, string url, ChannelConfig channel, JObject reqBody, bool isStream, RequestLog requestLog, CancellationToken ct, string? contentType, string endpointApiKey)
         {
-            using var timeoutCts = CreateTimeoutCts(ct, channel.Timeout);
+            // 总超时需考虑重试次数：每次尝试的 Timeout + 每次重试间隔的 RetryDelay
+            var totalTimeout = (int)((channel.RetryCount + 1) * channel.Timeout + channel.RetryCount * channel.RetryDelay);
+            using var timeoutCts = CreateTimeoutCts(ct, totalTimeout);
 
             var apiKey = string.IsNullOrEmpty(endpointApiKey) ? channel.ApiKey : endpointApiKey;
             // 通过工厂委托创建请求，便于 429 时自动重试（HttpRequestMessage 不可重用）
@@ -995,7 +1006,9 @@ namespace FunAiGateway.Services
         // Anthropic格式请求转发
         private async Task ForwardAnthropicRequestAsync(HttpListenerContext context, string url, ChannelConfig channel, JObject reqBody, bool isStream, RequestLog requestLog, CancellationToken ct)
         {
-            using var timeoutCts = CreateTimeoutCts(ct, channel.Timeout);
+            // 总超时需考虑重试次数：每次尝试的 Timeout + 每次重试间隔的 RetryDelay
+            var totalTimeout = (int)((channel.RetryCount + 1) * channel.Timeout + channel.RetryCount * channel.RetryDelay);
+            using var timeoutCts = CreateTimeoutCts(ct, totalTimeout);
 
             var apiKey = string.IsNullOrEmpty(channel.AnthropicApiKey) ? channel.ApiKey : channel.AnthropicApiKey;
             // 通过工厂委托创建请求，便于 429 时自动重试（HttpRequestMessage 不可重用）
@@ -1075,7 +1088,9 @@ namespace FunAiGateway.Services
         // Anthropic流式响应转OpenAI流式
         private async Task ForwardAnthropicStreamAsOpenAIAsync(HttpListenerContext context, string url, ChannelConfig channel, JObject anthropicReq, string modelName, RequestLog requestLog, CancellationToken ct)
         {
-            using var timeoutCts = CreateTimeoutCts(ct, channel.Timeout);
+            // 总超时需考虑重试次数：每次尝试的 Timeout + 每次重试间隔的 RetryDelay
+            var totalTimeout = (int)((channel.RetryCount + 1) * channel.Timeout + channel.RetryCount * channel.RetryDelay);
+            using var timeoutCts = CreateTimeoutCts(ct, totalTimeout);
 
             var apiKey = string.IsNullOrEmpty(channel.AnthropicApiKey) ? channel.ApiKey : channel.AnthropicApiKey;
             // 通过工厂委托创建请求，便于 429 时自动重试（HttpRequestMessage 不可重用）
@@ -1101,8 +1116,26 @@ namespace FunAiGateway.Services
             {
                 if (attempt > 1)
                 {
+                    // 重试前探测客户端是否仍连接：发送 SSE 注释行（客户端忽略），写入失败说明已断开
+                    try
+                    {
+                        var keepalive = System.Text.Encoding.UTF8.GetBytes(": keepalive\r\n");
+                        await context.Response.OutputStream.WriteAsync(keepalive, 0, keepalive.Length, timeoutCts.Token);
+                        await context.Response.OutputStream.FlushAsync(timeoutCts.Token);
+                    }
+                    catch (HttpListenerException)
+                    {
+                        Log($"渠道 [{channel.Name}] 客户端已断开连接，终止重试");
+                        return;
+                    }
+                    catch (IOException)
+                    {
+                        Log($"渠道 [{channel.Name}] 客户端已断开连接，终止重试");
+                        return;
+                    }
+
                     Log($"渠道 [{channel.Name}] 流式响应含错误，{channel.RetryDelay} 秒后进行第 {attempt - 1}/{channel.RetryCount} 次重试");
-                    try { await Task.Delay(TimeSpan.FromSeconds(channel.RetryDelay), ct); }
+                    try { await Task.Delay(TimeSpan.FromSeconds(channel.RetryDelay), timeoutCts.Token); }
                     catch (OperationCanceledException) { throw; }
                 }
 
@@ -1120,8 +1153,8 @@ namespace FunAiGateway.Services
                     Log($"上游错误（渠道={channel.Name} 模型={modelName} 状态={(int)resp.StatusCode}）: {errBody}");
                     context.Response.StatusCode = (int)resp.StatusCode;
                     context.Response.ContentType = "application/json";
-                    await context.Response.OutputStream.WriteAsync(System.Text.Encoding.UTF8.GetBytes(BuildMaskedError()), ct);
-                    await context.Response.OutputStream.FlushAsync(ct);
+                    await context.Response.OutputStream.WriteAsync(System.Text.Encoding.UTF8.GetBytes(BuildMaskedError()), timeoutCts.Token);
+                    await context.Response.OutputStream.FlushAsync(timeoutCts.Token);
                     return;
                 }
 
@@ -1135,9 +1168,9 @@ namespace FunAiGateway.Services
                 var firstBlock = new System.Text.StringBuilder();
                 bool hasError = false;
                 int maxPeek = 10;
-                while (maxPeek-- > 0 && !reader.EndOfStream && !ct.IsCancellationRequested)
+                while (maxPeek-- > 0 && !reader.EndOfStream && !timeoutCts.Token.IsCancellationRequested)
                 {
-                    var line = await reader.ReadLineAsync(ct);
+                    var line = await reader.ReadLineAsync(timeoutCts.Token);
                     if (line == null) break;
                     firstBlock.AppendLine(line);
                     if (SseLineContainsError(line)) hasError = true;
@@ -1155,15 +1188,15 @@ namespace FunAiGateway.Services
                 }
 
                 // 转换首块并写给客户端
-                await ConvertAndWriteAnthropicLineAsync(firstBlock.ToString(), context.Response.OutputStream, modelName, requestId, sbA2O, ct);
+                await ConvertAndWriteAnthropicLineAsync(firstBlock.ToString(), context.Response.OutputStream, modelName, requestId, sbA2O, timeoutCts.Token);
 
                 // 继续读取并转换剩余行
-                while (!reader.EndOfStream && !ct.IsCancellationRequested)
+                while (!reader.EndOfStream && !timeoutCts.Token.IsCancellationRequested)
                 {
-                    var line = await reader.ReadLineAsync(ct);
+                    var line = await reader.ReadLineAsync(timeoutCts.Token);
                     if (line == null) break;
                     if (string.IsNullOrWhiteSpace(line)) continue;
-                    await ConvertAndWriteAnthropicLineAsync(line, context.Response.OutputStream, modelName, requestId, sbA2O, ct);
+                    await ConvertAndWriteAnthropicLineAsync(line, context.Response.OutputStream, modelName, requestId, sbA2O, timeoutCts.Token);
                 }
 
                 LogResponseContent(channel, (int)resp.StatusCode, modelName, sbA2O.ToString());
@@ -1192,7 +1225,9 @@ namespace FunAiGateway.Services
         // OpenAI流式响应转Anthropic流式
         private async Task ForwardOpenAIStreamAsAnthropicAsync(HttpListenerContext context, string url, ChannelConfig channel, JObject openaiReq, string modelName, RequestLog requestLog, CancellationToken ct)
         {
-            using var timeoutCts = CreateTimeoutCts(ct, channel.Timeout);
+            // 总超时需考虑重试次数：每次尝试的 Timeout + 每次重试间隔的 RetryDelay
+            var totalTimeout = (int)((channel.RetryCount + 1) * channel.Timeout + channel.RetryCount * channel.RetryDelay);
+            using var timeoutCts = CreateTimeoutCts(ct, totalTimeout);
 
             var apiKey = string.IsNullOrEmpty(channel.OpenAIApiKey) ? channel.ApiKey : channel.OpenAIApiKey;
             // 通过工厂委托创建请求，便于 429 时自动重试（HttpRequestMessage 不可重用）
@@ -1215,8 +1250,8 @@ namespace FunAiGateway.Services
                 Log($"上游错误（渠道={channel.Name} 模型={modelName} 状态={(int)resp.StatusCode}）: {errBody}");
                 context.Response.StatusCode = (int)resp.StatusCode;
                 context.Response.ContentType = "application/json";
-                await context.Response.OutputStream.WriteAsync(System.Text.Encoding.UTF8.GetBytes(BuildMaskedError()), ct);
-                await context.Response.OutputStream.FlushAsync(ct);
+                await context.Response.OutputStream.WriteAsync(System.Text.Encoding.UTF8.GetBytes(BuildMaskedError()), timeoutCts.Token);
+                await context.Response.OutputStream.FlushAsync(timeoutCts.Token);
                 return;
             }
 
@@ -1240,9 +1275,9 @@ namespace FunAiGateway.Services
                 var firstBlock = new System.Text.StringBuilder();
                 bool hasError = false;
                 int maxPeek = 10;
-                while (maxPeek-- > 0 && !reader.EndOfStream && !ct.IsCancellationRequested)
+                while (maxPeek-- > 0 && !reader.EndOfStream && !timeoutCts.Token.IsCancellationRequested)
                 {
-                    var line = await reader.ReadLineAsync(ct);
+                    var line = await reader.ReadLineAsync(timeoutCts.Token);
                     if (line == null) break;
                     firstBlock.AppendLine(line);
                     if (SseLineContainsError(line)) hasError = true;
@@ -1264,7 +1299,7 @@ namespace FunAiGateway.Services
                 if (retryAttempt > maxAttempts) break;
 
                 Log($"渠道 [{channel.Name}] {channel.RetryDelay} 秒后进行第 {retryAttempt - 1}/{channel.RetryCount} 次重试");
-                try { await Task.Delay(TimeSpan.FromSeconds(channel.RetryDelay), ct); }
+                try { await Task.Delay(TimeSpan.FromSeconds(channel.RetryDelay), timeoutCts.Token); }
                 catch (OperationCanceledException) { throw; }
 
                 // 重新发请求（这里跳出后需要重新读取流，简化处理：直接 break 让外层无法重试，
@@ -1289,7 +1324,7 @@ namespace FunAiGateway.Services
                     ["usage"] = new JObject { ["input_tokens"] = 0, ["output_tokens"] = 0 }
                 }
             })}\r\n\r\n";
-            await context.Response.OutputStream.WriteAsync(System.Text.Encoding.UTF8.GetBytes(msgStart), 0, msgStart.Length, ct);
+            await context.Response.OutputStream.WriteAsync(System.Text.Encoding.UTF8.GetBytes(msgStart), 0, msgStart.Length, timeoutCts.Token);
             if (sbO2A.Length < 104857600) { sbO2A.Append(msgStart); }
 
             // 使用有状态转换器：动态生成 content_block_start/stop、text_delta、input_json_delta、message_delta
@@ -1300,8 +1335,8 @@ namespace FunAiGateway.Services
             async Task WriteConvertedAsync(string text)
             {
                 var bytes = System.Text.Encoding.UTF8.GetBytes(text);
-                await context.Response.OutputStream.WriteAsync(bytes, 0, bytes.Length, ct);
-                await context.Response.OutputStream.FlushAsync(ct);
+                await context.Response.OutputStream.WriteAsync(bytes, 0, bytes.Length, timeoutCts.Token);
+                await context.Response.OutputStream.FlushAsync(timeoutCts.Token);
                 if (sbO2A.Length < 104857600) { sbO2A.Append(text); }
             }
 
@@ -1318,9 +1353,9 @@ namespace FunAiGateway.Services
             }
 
             // 继续读取并转换剩余流
-            while (!reader.EndOfStream && !ct.IsCancellationRequested)
+            while (!reader.EndOfStream && !timeoutCts.Token.IsCancellationRequested)
             {
-                var line = await reader.ReadLineAsync(ct);
+                var line = await reader.ReadLineAsync(timeoutCts.Token);
                 if (line == null) break;
                 if (string.IsNullOrWhiteSpace(line)) continue;
 
@@ -1340,8 +1375,8 @@ namespace FunAiGateway.Services
 
             // 结束事件
             var msgStop = "event: message_stop\ndata: {\"type\":\"message_stop\"}\r\n\r\n";
-            await context.Response.OutputStream.WriteAsync(System.Text.Encoding.UTF8.GetBytes(msgStop), 0, msgStop.Length, ct);
-            await context.Response.OutputStream.FlushAsync(ct);
+            await context.Response.OutputStream.WriteAsync(System.Text.Encoding.UTF8.GetBytes(msgStop), 0, msgStop.Length, timeoutCts.Token);
+            await context.Response.OutputStream.FlushAsync(timeoutCts.Token);
             if (sbO2A.Length < 104857600) { sbO2A.Append(msgStop); }
 
             LogResponseContent(channel, (int)resp.StatusCode, modelName, sbO2A.ToString());
@@ -2195,6 +2230,26 @@ document.getElementById('keyInput').addEventListener('keypress',function(e){if(e
                 // 首次不延迟；后续重试前按渠道配置的 RetryDelay 秒数延迟
                 if (attempt > 1)
                 {
+                    // 重试前探测客户端是否仍连接：发送 SSE 注释行（客户端忽略），写入失败说明已断开
+                    try
+                    {
+                        var keepalive = System.Text.Encoding.UTF8.GetBytes(": keepalive\r\n");
+                        await output.WriteAsync(keepalive, 0, keepalive.Length, ct);
+                        await output.FlushAsync(ct);
+                    }
+                    catch (HttpListenerException)
+                    {
+                        Log($"渠道 [{channel.Name}] 客户端已断开连接，终止重试");
+                        resp?.Dispose();
+                        throw new OperationCanceledException("客户端已断开连接", ct);
+                    }
+                    catch (IOException)
+                    {
+                        Log($"渠道 [{channel.Name}] 客户端已断开连接，终止重试");
+                        resp?.Dispose();
+                        throw new OperationCanceledException("客户端已断开连接", ct);
+                    }
+
                     Log($"渠道 [{channel.Name}] 流式响应含错误，{channel.RetryDelay} 秒后进行第 {attempt - 1}/{channel.RetryCount} 次重试");
                     try { await Task.Delay(TimeSpan.FromSeconds(channel.RetryDelay), ct); }
                     catch (OperationCanceledException) { throw; }
@@ -2255,9 +2310,9 @@ document.getElementById('keyInput').addEventListener('keypress',function(e){if(e
                 bool hasError = false;
                 // 读取一个完整 SSE 事件（以空行分隔），最多读若干行避免读太多
                 int maxPeekLines = 10;
-                while (maxPeekLines-- > 0 && !reader.EndOfStream && !ct.IsCancellationRequested)
+                while (maxPeekLines-- > 0 && !reader.EndOfStream && !attemptCt.IsCancellationRequested)
                 {
-                    line = await reader.ReadLineAsync(ct);
+                    line = await reader.ReadLineAsync(attemptCt);
                     if (line == null) break;
                     firstBlock.AppendLine(line);
                     if (SseLineContainsError(line)) hasError = true;
@@ -2279,6 +2334,7 @@ document.getElementById('keyInput').addEventListener('keypress',function(e){if(e
                 }
 
                 // 无错误 或 最后一次尝试：把首块 + 剩余流透传给客户端
+                // 流转发阶段使用外层 ct（已含总超时），不再受 attemptCt 约束
                 // 1. 先写首块
                 var firstBytes = System.Text.Encoding.UTF8.GetBytes(firstBlock.ToString());
                 try

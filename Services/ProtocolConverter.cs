@@ -200,6 +200,16 @@ namespace FunAiGateway.Services
                     anthropicReq["tools"] = anthropicTools;
             }
 
+            // 启用思考推理：OpenAI的 enable_thinking:true 转换为 Anthropic的 thinking 字段
+            if (openaiReq["enable_thinking"]?.Value<bool>() == true)
+            {
+                anthropicReq["thinking"] = new JObject
+                {
+                    ["type"] = "enabled",
+                    ["budget_tokens"] = 8192
+                };
+            }
+
             return (anthropicReq, systemPrompt);
         }
 
